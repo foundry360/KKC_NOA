@@ -46,9 +46,9 @@ supabase db push
 
 ## Current cascade status
 
-**Step 4 — FHIR Ingestion** complete (through `NORMALIZED`).
+**Step 5 — Rules** complete (through `EVALUATED` / Decision).
 
-Next: **Step 5 — Rules** (AdmissionEvent → NOA Decision).
+Next: **Step 6 — Contracts** (Decision → Contract / destination).
 
 ## Security note
 

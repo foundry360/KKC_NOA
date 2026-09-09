@@ -1,0 +1,18 @@
+{
+  "name": "OUTPATIENT_NO_NOA",
+  "description": "Explicitly mark outpatient admissions as not requiring NOA",
+  "version": 1,
+  "priority": 90,
+  "conditions": {
+    "all": [
+      { "path": "eventType", "op": "eq", "value": "ADMISSION" },
+      { "path": "encounter.class", "op": "eq", "value": "OUTPATIENT" }
+    ]
+  },
+  "actions": {
+    "decision": "NO_NOA_REQUIRED",
+    "notificationRequired": false,
+    "notificationType": "NOA",
+    "priority": "LOW"
+  }
+}

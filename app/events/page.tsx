@@ -5,7 +5,7 @@ import { getIngestRuntime } from "@/src/infrastructure/composition/ingest";
 export const dynamic = "force-dynamic";
 
 export default async function EventsPage() {
-  const { events, admissions } = getIngestRuntime();
+  const { events, admissions, decisions } = getIngestRuntime();
   const recent = await events.listRecent(25);
 
   return (
@@ -26,6 +26,7 @@ export default async function EventsPage() {
               <tr className="border-b border-black/10 text-xs uppercase tracking-wide text-black/50 dark:border-white/15 dark:text-white/50">
                 <th className="py-2 pr-3 font-medium">Correlation</th>
                 <th className="py-2 pr-3 font-medium">State</th>
+                <th className="py-2 pr-3 font-medium">Decision</th>
                 <th className="py-2 pr-3 font-medium">Class / Payer</th>
                 <th className="py-2 pr-3 font-medium">Received</th>
                 <th className="py-2 font-medium">Detail</th>
@@ -35,6 +36,7 @@ export default async function EventsPage() {
               {await Promise.all(
                 recent.map(async (event) => {
                   const admission = await admissions.findByEventId(event.id);
+                  const decision = await decisions.findByEventId(event.id);
                   return (
                     <tr
                       key={event.id}
@@ -44,6 +46,7 @@ export default async function EventsPage() {
                         {event.correlationId}
                       </td>
                       <td className="py-3 pr-3">{event.processingState}</td>
+                      <td className="py-3 pr-3">{decision?.decision ?? "—"}</td>
                       <td className="py-3 pr-3 text-black/70 dark:text-white/70">
                         {admission
                           ? `${admission.encounter.class} / ${admission.payer.payerType ?? "—"}`

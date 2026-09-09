@@ -11,11 +11,13 @@ export default async function EventDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const { events, admissions, audit } = getIngestRuntime();
+  const { events, admissions, audit, decisions, executions } = getIngestRuntime();
   const event = await events.findById(id);
   if (!event) notFound();
 
   const admission = await admissions.findByEventId(event.id);
+  const decision = await decisions.findByEventId(event.id);
+  const execution = await executions.findByEventId(event.id);
   const trail = await audit.listByCorrelationId(event.correlationId);
 
   return (
@@ -105,6 +107,60 @@ export default async function EventDetailPage({
           </p>
         </section>
       )}
+
+      <section className="mb-8 space-y-2">
+        <h2 className="text-lg font-semibold">Decision</h2>
+        {decision ? (
+          <dl className="grid gap-2 text-sm sm:grid-cols-2">
+            <div>
+              <dt className="text-black/50 dark:text-white/50">Decision</dt>
+              <dd className="font-medium">{decision.decision}</dd>
+            </div>
+            <div>
+              <dt className="text-black/50 dark:text-white/50">NOA required</dt>
+              <dd>{decision.notificationRequired ? "Yes" : "No"}</dd>
+            </div>
+            <div>
+              <dt className="text-black/50 dark:text-white/50">Type / Priority</dt>
+              <dd>
+                {decision.notificationType ?? "—"} / {decision.priority ?? "—"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-black/50 dark:text-white/50">Rules applied</dt>
+              <dd className="font-mono text-xs">
+                {decision.rulesApplied.length
+                  ? decision.rulesApplied.join(", ")
+                  : "—"}
+              </dd>
+            </div>
+            <div className="sm:col-span-2">
+              <dt className="text-black/50 dark:text-white/50">Rule versions</dt>
+              <dd className="font-mono text-xs">
+                {decision.ruleVersions.length
+                  ? decision.ruleVersions.join(", ")
+                  : "—"}
+              </dd>
+            </div>
+            {execution ? (
+              <div className="sm:col-span-2">
+                <dt className="text-black/50 dark:text-white/50">
+                  Execution input snapshot
+                </dt>
+                <dd>
+                  <pre className="mt-1 overflow-x-auto rounded-md bg-black/[0.04] p-3 font-mono text-xs dark:bg-white/[0.06]">
+                    {JSON.stringify(execution.inputSnapshot, null, 2)}
+                  </pre>
+                </dd>
+              </div>
+            ) : null}
+          </dl>
+        ) : (
+          <p className="text-sm text-black/60 dark:text-white/60">
+            No decision recorded for this event.
+          </p>
+        )}
+      </section>
 
       <section className="mb-8 space-y-2">
         <h2 className="text-lg font-semibold">Audit</h2>

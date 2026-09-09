@@ -14,7 +14,7 @@ Health/discovery for the ingest endpoint.
   "endpoint": "/api/fhir/r4/events",
   "status": "ready",
   "accepts": ["application/fhir+json", "application/json"],
-  "pipelineThrough": "NORMALIZED"
+    "pipelineThrough": "EVALUATED",
 }
 ```
 
@@ -24,13 +24,15 @@ Health/discovery for the ingest endpoint.
 
 Receives a FHIR R4 Bundle representing an admission notification.
 
-The listener does **not** evaluate NOA business rules. Through Step 4 it processes:
+The listener does **not** embed NOA business rules in the route handler. Through Step 5 the pipeline processes:
 
 ```
-RECEIVED → VALIDATED → NORMALIZED
+RECEIVED → VALIDATED → NORMALIZED → EVALUATED
 ```
 
-(or `VALIDATION_FAILED`)
+(or `VALIDATION_FAILED` / `RULE_REJECTED`)
+
+Rules run in `DecisioningService` after normalization via `DefaultNoaPipeline`.
 
 #### Headers
 
@@ -53,19 +55,27 @@ FHIR R4 `Bundle` JSON. See `docs/FHIR_MODEL.md` and `/fhir/fixtures`.
 
 #### Success response `202 Accepted`
 
-Processing completed through `NORMALIZED` (sync POC).
+Processing completed through `EVALUATED` (sync POC: ingest + rules).
 
 ```json
 {
   "eventId": "uuid",
   "correlationId": "NOA-20260909-000001",
-  "processingState": "NORMALIZED",
+  "processingState": "EVALUATED",
   "eventType": "ADMISSION",
   "admissionEvent": {
     "encounterClass": "INPATIENT",
     "payerType": "MEDICARE",
     "admissionDateTime": "2026-09-09T14:30:00Z",
     "facilityName": "Synthetic General Hospital"
+  },
+  "decision": {
+    "decision": "SEND_NOA",
+    "notificationRequired": true,
+    "notificationType": "NOA",
+    "priority": "HIGH",
+    "rulesApplied": ["MEDICARE_INPATIENT_NOA"],
+    "ruleVersions": ["MEDICARE_INPATIENT_NOA@1"]
   }
 }
 ```

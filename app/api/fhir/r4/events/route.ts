@@ -28,7 +28,6 @@ function extractApiKey(request: NextRequest): string | undefined {
 
 function assertAuthorized(request: NextRequest): NextResponse | null {
   const expected = getFhirIngestApiKey();
-  // When unset, allow local/dev ingest (documented in API_CONTRACT).
   if (!expected) {
     return null;
   }
@@ -45,7 +44,7 @@ export async function GET() {
     endpoint: "/api/fhir/r4/events",
     status: "ready",
     accepts: ["application/fhir+json", "application/json"],
-    pipelineThrough: "NORMALIZED",
+    pipelineThrough: "EVALUATED",
   });
 }
 
@@ -55,8 +54,7 @@ export async function POST(request: NextRequest) {
 
   const contentType = request.headers.get("content-type") ?? "";
   const correlationHeader = request.headers.get("x-correlation-id") ?? undefined;
-  const sourceSystem =
-    request.headers.get("x-source-system") ?? undefined;
+  const sourceSystem = request.headers.get("x-source-system") ?? undefined;
 
   let rawBody: unknown;
   try {
@@ -74,26 +72,40 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { ingestion } = getIngestRuntime();
-    const result = await ingestion.ingest({
+    const { pipeline, admissions } = getIngestRuntime();
+    const result = await pipeline.process({
       rawBody,
       contentType,
       correlationId: correlationHeader,
       sourceSystem,
     });
 
+    const admission = await admissions.findByEventId(result.eventId);
+
     const body = {
       eventId: result.eventId,
       correlationId: result.correlationId,
       processingState: result.processingState,
       eventType: "ADMISSION",
-      ...(result.admissionEvent
+      ...(admission
         ? {
             admissionEvent: {
-              encounterClass: result.admissionEvent.encounter.class,
-              payerType: result.admissionEvent.payer.payerType,
-              admissionDateTime: result.admissionEvent.admission.admissionDateTime,
-              facilityName: result.admissionEvent.facility.name,
+              encounterClass: admission.encounter.class,
+              payerType: admission.payer.payerType,
+              admissionDateTime: admission.admission.admissionDateTime,
+              facilityName: admission.facility.name,
+            },
+          }
+        : {}),
+      ...(result.decision
+        ? {
+            decision: {
+              decision: result.decision.decision,
+              notificationRequired: result.decision.notificationRequired,
+              notificationType: result.decision.notificationType,
+              priority: result.decision.priority,
+              rulesApplied: result.decision.rulesApplied,
+              ruleVersions: result.decision.ruleVersions,
             },
           }
         : {}),
@@ -107,7 +119,13 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Sync POC: processing completed through NORMALIZED
+    if (result.processingState === "RULE_REJECTED") {
+      return NextResponse.json(body, {
+        status: 200,
+        headers: { "X-Correlation-Id": result.correlationId },
+      });
+    }
+
     return NextResponse.json(body, {
       status: 202,
       headers: { "X-Correlation-Id": result.correlationId },

@@ -1,0 +1,87 @@
+{
+  "resourceType": "Bundle",
+  "id": "synthetic-admission-outpatient-001",
+  "type": "message",
+  "timestamp": "2026-09-09T10:00:00Z",
+  "entry": [
+    {
+      "resource": {
+        "resourceType": "MessageHeader",
+        "id": "message-header-op",
+        "eventCoding": { "code": "A01", "display": "Admit/visit notification" },
+        "source": { "name": "Synthetic EHR", "endpoint": "urn:synthetic:ehr" },
+        "focus": [{ "reference": "Encounter/encounter-op" }]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Patient",
+        "id": "patient-op",
+        "identifier": [
+          { "system": "http://synthetic.example.org/mrn", "value": "SYN-MRN-20002" }
+        ],
+        "name": [{ "family": "SYNTHETIC", "given": ["ALAN"] }],
+        "gender": "male",
+        "birthDate": "1965-03-20"
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Encounter",
+        "id": "encounter-op",
+        "status": "finished",
+        "class": {
+          "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+          "code": "AMB",
+          "display": "ambulatory"
+        },
+        "subject": { "reference": "Patient/patient-op" },
+        "period": { "start": "2026-09-09T10:00:00Z", "end": "2026-09-09T11:00:00Z" },
+        "serviceProvider": { "reference": "Organization/facility-op" }
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Coverage",
+        "id": "coverage-op",
+        "status": "active",
+        "subscriberId": "SYN-MBI-000222",
+        "beneficiary": { "reference": "Patient/patient-op" },
+        "payor": [{ "reference": "Organization/payer-op" }]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Organization",
+        "id": "facility-op",
+        "name": "Synthetic Outpatient Clinic",
+        "identifier": [
+          { "system": "http://hl7.org/fhir/sid/us-npi", "value": "1999999997" }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Organization",
+        "id": "payer-op",
+        "name": "Synthetic Medicare Administrative Contractor",
+        "identifier": [
+          {
+            "system": "http://synthetic.example.org/payer-type",
+            "value": "MEDICARE"
+          }
+        ],
+        "type": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/organization-type",
+                "code": "pay"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

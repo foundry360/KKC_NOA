@@ -48,12 +48,13 @@ Deferred to Foundation/Ingestion: `docs/API_CONTRACT.md`.
 - Tests: FHIR → AdmissionEvent
 - `API_CONTRACT.md`
 
-### Step 5 — Rules
+### Step 5 — Rules ✅
 
-- Condition evaluator + `RulesEngine`
-- Seed Medicare inpatient rule
+- Condition evaluator + `ConfigurableRulesEngine`
+- Seed `MEDICARE_INPATIENT_NOA` + `OUTPATIENT_NO_NOA`
 - Persist executions + decisions
-- Demo: AdmissionEvent → Decision
+- `DefaultNoaPipeline`: FHIR → … → Decision
+- Demo: AdmissionEvent → NOA Decision
 
 ### Step 6 — Contracts
 
@@ -107,9 +108,8 @@ Deferred to Foundation/Ingestion: `docs/API_CONTRACT.md`.
 
 ## Next Action
 
-**Step 4 — FHIR Ingestion is complete.** Proceed to **Step 5 — Rules**:
+**Step 5 — Rules is complete.** Proceed to **Step 6 — Contracts**:
 
-- Condition evaluator + `RulesEngine`
-- Seed Medicare inpatient rule
-- Persist executions + decisions
-- Demonstrate AdmissionEvent → Decision
+- Contract registry + destinations + selection
+- Seed mock / SF / Pega contracts
+- Demonstrate Decision → Contract

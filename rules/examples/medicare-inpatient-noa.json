@@ -1,0 +1,19 @@
+{
+  "name": "MEDICARE_INPATIENT_NOA",
+  "description": "Require NOA for Medicare inpatient admissions",
+  "version": 1,
+  "priority": 100,
+  "conditions": {
+    "all": [
+      { "path": "eventType", "op": "eq", "value": "ADMISSION" },
+      { "path": "encounter.class", "op": "eq", "value": "INPATIENT" },
+      { "path": "payer.payerType", "op": "eq", "value": "MEDICARE" }
+    ]
+  },
+  "actions": {
+    "decision": "SEND_NOA",
+    "notificationRequired": true,
+    "notificationType": "NOA",
+    "priority": "HIGH"
+  }
+}
