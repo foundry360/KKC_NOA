@@ -1,21 +1,22 @@
+import type { Clock, Logger } from "@/src/domain/ports";
 import {
   InMemoryAdmissionEventRepository,
   InMemoryAuditPort,
+  InMemoryDecisionRepository,
   InMemoryEventRepository,
+  InMemoryRuleExecutionRepository,
+  InMemoryRuleRepository,
 } from "@/src/infrastructure/memory";
 import {
   InMemoryContractRepository,
   InMemoryDestinationRepository,
   InMemoryTransformationRepository,
 } from "@/src/infrastructure/memory/contract-repositories";
-import { InMemoryDecisionRepository } from "@/src/infrastructure/memory/decision-repository";
 import {
   InMemoryDeadLetterRepository,
   InMemoryDeliveryAttemptRepository,
   InMemoryNotificationRepository,
 } from "@/src/infrastructure/memory/delivery-repositories";
-import { InMemoryRuleExecutionRepository } from "@/src/infrastructure/memory/rule-execution-repository";
-import { InMemoryRuleRepository } from "@/src/infrastructure/memory/rule-repository";
 import { InMemoryRoutingSelectionRepository } from "@/src/infrastructure/memory/routing-selection-repository";
 import { InMemoryTransformationResultRepository } from "@/src/infrastructure/memory/transformation-result-repository";
 import {
@@ -33,50 +34,21 @@ import { DefaultDeliveryAdapterRegistry } from "@/src/adapters/registry";
 import { DecisioningService } from "@/src/services/decisioning/decisioning-service";
 import { ConfigurableRulesEngine } from "@/src/services/decisioning/rules-engine";
 import { DefaultDeliveryService } from "@/src/services/delivery/delivery-service";
-import { AdmissionFhirValidator } from "@/src/services/fhir/validator";
 import { FhirIngestionService } from "@/src/services/fhir/ingestion-service";
+import { AdmissionFhirValidator } from "@/src/services/fhir/validator";
 import { AdmissionNormalizationService } from "@/src/services/normalization/normalize-admission";
 import { DefaultNoaPipeline } from "@/src/services/pipeline/noa-pipeline";
 import { DefaultContractRegistry } from "@/src/services/routing/contract-registry";
 import { RoutingService } from "@/src/services/routing/routing-service";
 import { SimpleMappingTransformationEngine } from "@/src/services/transformation/mapping-engine";
 import { TransformationService } from "@/src/services/transformation/transformation-service";
-import { SystemClock } from "@/src/utils/clock";
-import { DefaultIdGenerator } from "@/src/utils/id-generator";
-import { ConsoleLogger } from "@/src/utils/logger";
+import { SequentialIdGenerator } from "@/src/utils/id-generator";
 
-export type IngestRuntime = {
-  pipeline: DefaultNoaPipeline;
-  ingestion: FhirIngestionService;
-  decisioning: DecisioningService;
-  routing: RoutingService;
-  transformation: TransformationService;
-  delivery: DefaultDeliveryService;
-  events: InMemoryEventRepository;
-  admissions: InMemoryAdmissionEventRepository;
-  audit: InMemoryAuditPort;
-  decisions: InMemoryDecisionRepository;
-  rules: InMemoryRuleRepository;
-  executions: InMemoryRuleExecutionRepository;
-  contracts: InMemoryContractRepository;
-  destinations: InMemoryDestinationRepository;
-  transformations: InMemoryTransformationRepository;
-  selections: InMemoryRoutingSelectionRepository;
-  transformResults: InMemoryTransformationResultRepository;
-  notifications: InMemoryNotificationRepository;
-  attempts: InMemoryDeliveryAttemptRepository;
-  deadLetters: InMemoryDeadLetterRepository;
-};
-
-const RUNTIME_VERSION = 8;
-
-const globalStore = globalThis as typeof globalThis & {
-  __noaIngestRuntime?: IngestRuntime;
-  __noaRuntimeVersion?: number;
-};
-
-export function createIngestRuntime(): IngestRuntime {
-  const clock = new SystemClock();
+export function createTestPipeline(
+  clock: Clock,
+  logger: Logger,
+  options?: { mockAdapter?: MockDeliveryAdapter }
+) {
   const events = new InMemoryEventRepository();
   const admissions = new InMemoryAdmissionEventRepository();
   const audit = new InMemoryAuditPort();
@@ -97,35 +69,11 @@ export function createIngestRuntime(): IngestRuntime {
   const attempts = new InMemoryDeliveryAttemptRepository();
   const deadLetters = new InMemoryDeadLetterRepository();
 
-  const logger = new ConsoleLogger("fhir-noa");
-  const ids = new DefaultIdGenerator(clock);
-
-  const ingestion = new FhirIngestionService({
-    ids,
-    clock,
-    logger,
-    events,
-    admissions,
-    audit,
-    validator: new AdmissionFhirValidator(),
-    normalizer: new AdmissionNormalizationService(),
-  });
-
-  const decisioning = new DecisioningService({
-    clock,
-    logger,
-    rulesEngine: new ConfigurableRulesEngine(rules),
-    events,
-    decisions,
-    executions,
-    audit,
-  });
-
   const registry = new DefaultContractRegistry(
     contracts,
     destinations,
     transformations,
-    process.env.DEFAULT_NOA_CONTRACT ?? DEFAULT_NOA_CONTRACT_BUSINESS_ID
+    DEFAULT_NOA_CONTRACT_BUSINESS_ID
   );
 
   const routing = new RoutingService({
@@ -146,8 +94,8 @@ export function createIngestRuntime(): IngestRuntime {
     audit,
   });
 
+  const mockAdapter = options?.mockAdapter ?? new MockDeliveryAdapter();
   const adapters = new DefaultDeliveryAdapterRegistry();
-  const mockAdapter = new MockDeliveryAdapter();
   adapters.register(mockAdapter);
   adapters.register(new RestDeliveryAdapter());
   adapters.register(new SalesforceDeliveryAdapter(mockAdapter));
@@ -165,8 +113,25 @@ export function createIngestRuntime(): IngestRuntime {
   });
 
   const pipeline = new DefaultNoaPipeline(
-    ingestion,
-    decisioning,
+    new FhirIngestionService({
+      ids: new SequentialIdGenerator(clock),
+      clock,
+      logger,
+      events,
+      admissions,
+      audit,
+      validator: new AdmissionFhirValidator(),
+      normalizer: new AdmissionNormalizationService(),
+    }),
+    new DecisioningService({
+      clock,
+      logger,
+      rulesEngine: new ConfigurableRulesEngine(rules),
+      events,
+      decisions,
+      executions,
+      audit,
+    }),
     routing,
     transformation,
     delivery
@@ -174,40 +139,18 @@ export function createIngestRuntime(): IngestRuntime {
 
   return {
     pipeline,
-    ingestion,
-    decisioning,
-    routing,
-    transformation,
-    delivery,
     events,
     admissions,
     audit,
     decisions,
-    rules,
-    executions,
-    contracts,
-    destinations,
-    transformations,
     selections,
     transformResults,
     notifications,
     attempts,
     deadLetters,
+    mockAdapter,
+    destinations,
+    contracts,
+    delivery,
   };
-}
-
-export function getIngestRuntime(): IngestRuntime {
-  if (
-    !globalStore.__noaIngestRuntime ||
-    globalStore.__noaRuntimeVersion !== RUNTIME_VERSION
-  ) {
-    globalStore.__noaIngestRuntime = createIngestRuntime();
-    globalStore.__noaRuntimeVersion = RUNTIME_VERSION;
-  }
-  return globalStore.__noaIngestRuntime;
-}
-
-export function setIngestRuntime(runtime: IngestRuntime | undefined): void {
-  globalStore.__noaIngestRuntime = runtime;
-  globalStore.__noaRuntimeVersion = runtime ? RUNTIME_VERSION : undefined;
 }

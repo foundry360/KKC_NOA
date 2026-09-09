@@ -19,6 +19,12 @@ export class InMemoryAuditPort implements AuditPort {
       .sort((a, b) => a.timestamp.localeCompare(b.timestamp));
   }
 
+  async listRecent(limit: number): Promise<AuditEntry[]> {
+    return [...this.entries]
+      .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
+      .slice(0, limit);
+  }
+
   clear(): void {
     this.entries.length = 0;
   }

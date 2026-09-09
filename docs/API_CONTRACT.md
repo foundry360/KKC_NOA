@@ -14,7 +14,7 @@ Health/discovery for the ingest endpoint.
   "endpoint": "/api/fhir/r4/events",
   "status": "ready",
   "accepts": ["application/fhir+json", "application/json"],
-    "pipelineThrough": "EVALUATED",
+    "pipelineThrough": "TRANSFORMED",
 }
 ```
 
@@ -24,15 +24,13 @@ Health/discovery for the ingest endpoint.
 
 Receives a FHIR R4 Bundle representing an admission notification.
 
-The listener does **not** embed NOA business rules in the route handler. Through Step 5 the pipeline processes:
+Through Step 8 the pipeline processes:
 
 ```
-RECEIVED → VALIDATED → NORMALIZED → EVALUATED
+RECEIVED → VALIDATED → NORMALIZED → EVALUATED → ROUTED → TRANSFORMED → DELIVERED → ACKNOWLEDGED
 ```
 
-(or `VALIDATION_FAILED` / `RULE_REJECTED`)
-
-Rules run in `DecisioningService` after normalization via `DefaultNoaPipeline`.
+(or `VALIDATION_FAILED` / `RULE_REJECTED` / `NO_CONTRACT` / `TRANSFORM_FAILED` / `DEAD_LETTER`)
 
 #### Headers
 
@@ -42,7 +40,7 @@ Rules run in `DecisioningService` after normalization via `DefaultNoaPipeline`.
 | `X-API-Key` | Conditional | Required when `FHIR_INGEST_API_KEY` is set |
 | `Authorization` | Conditional | `Bearer <key>` accepted as alternative to `X-API-Key` |
 | `X-Correlation-Id` | No | If omitted, server generates `NOA-YYYYMMDD-######` |
-| `X-Source-System` | No | Defaults to `SYNTHETIC_EHR` |
+| `X-Contract-Id` | No | Demo override for contract business id (SF/Pega/Mock) |
 
 #### Auth (POC)
 
@@ -55,13 +53,13 @@ FHIR R4 `Bundle` JSON. See `docs/FHIR_MODEL.md` and `/fhir/fixtures`.
 
 #### Success response `202 Accepted`
 
-Processing completed through `EVALUATED` (sync POC: ingest + rules).
+Processing completed through `TRANSFORMED` when NOA is required (sync POC: ingest + rules + contract + transform).
 
 ```json
 {
   "eventId": "uuid",
   "correlationId": "NOA-20260909-000001",
-  "processingState": "EVALUATED",
+  "processingState": "TRANSFORMED",
   "eventType": "ADMISSION",
   "admissionEvent": {
     "encounterClass": "INPATIENT",
@@ -76,6 +74,23 @@ Processing completed through `EVALUATED` (sync POC: ingest + rules).
     "priority": "HIGH",
     "rulesApplied": ["MEDICARE_INPATIENT_NOA"],
     "ruleVersions": ["MEDICARE_INPATIENT_NOA@1"]
+  },
+  "routing": {
+    "contractBusinessId": "MEDICARE_NOA_MOCK_V1",
+    "destinationCode": "MOCK_PAYER",
+    "adapterKey": "mock",
+    "transformerCode": "MEDICARE_NOA_MOCK_TRANSFORM"
+  },
+  "transformation": {
+    "transformerCode": "MEDICARE_NOA_MOCK_TRANSFORM",
+    "payload": {
+      "notificationType": "NOA",
+      "admissionDateTime": "2026-09-09T14:30:00.000Z",
+      "patient": { "lastName": "SYNTHETIC", "firstName": "ADA" },
+      "encounterClass": "INPATIENT",
+      "payerType": "MEDICARE",
+      "correlationId": "NOA-20260909-000001"
+    }
   }
 }
 ```

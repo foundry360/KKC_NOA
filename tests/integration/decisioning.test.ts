@@ -2,7 +2,6 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
-  InMemoryAdmissionEventRepository,
   InMemoryAuditPort,
   InMemoryDecisionRepository,
   InMemoryEventRepository,
@@ -12,14 +11,10 @@ import {
 import { createSeedRuleVersions } from "@/src/infrastructure/seed/rules";
 import { DecisioningService } from "@/src/services/decisioning/decisioning-service";
 import { ConfigurableRulesEngine } from "@/src/services/decisioning/rules-engine";
-import { FhirIngestionService } from "@/src/services/fhir/ingestion-service";
-import { AdmissionFhirValidator } from "@/src/services/fhir/validator";
-import { AdmissionNormalizationService } from "@/src/services/normalization/normalize-admission";
-import { DefaultNoaPipeline } from "@/src/services/pipeline/noa-pipeline";
 import { FixedClock } from "@/src/utils/clock";
-import { SequentialIdGenerator } from "@/src/utils/id-generator";
 import { MemoryLogger } from "@/src/utils/logger";
 import type { AdmissionEvent } from "@/src/domain/admission/admission-event";
+import { createTestPipeline } from "../helpers/test-pipeline";
 
 function loadFixture(name: string): unknown {
   const file = path.join(process.cwd(), "fhir", "fixtures", name);
@@ -120,39 +115,10 @@ describe("AdmissionEvent → Decision", () => {
   });
 });
 
-describe("Pipeline FHIR → Decision", () => {
-  it("golden path ends EVALUATED with SEND_NOA", async () => {
+describe("Pipeline FHIR → Decision (+ Contract + Transform)", () => {
+  it("golden path ends TRANSFORMED after SEND_NOA", async () => {
     const clock = new FixedClock(new Date("2026-09-09T18:00:00.000Z"));
-    const events = new InMemoryEventRepository();
-    const admissions = new InMemoryAdmissionEventRepository();
-    const audit = new InMemoryAuditPort();
-    const decisions = new InMemoryDecisionRepository();
-    const executions = new InMemoryRuleExecutionRepository();
-    const rules = new InMemoryRuleRepository();
-    rules.seed(createSeedRuleVersions());
-    const logger = new MemoryLogger();
-
-    const pipeline = new DefaultNoaPipeline(
-      new FhirIngestionService({
-        ids: new SequentialIdGenerator(clock),
-        clock,
-        logger,
-        events,
-        admissions,
-        audit,
-        validator: new AdmissionFhirValidator(),
-        normalizer: new AdmissionNormalizationService(),
-      }),
-      new DecisioningService({
-        clock,
-        logger,
-        rulesEngine: new ConfigurableRulesEngine(rules),
-        events,
-        decisions,
-        executions,
-        audit,
-      })
-    );
+    const { pipeline, audit } = createTestPipeline(clock, new MemoryLogger());
 
     const result = await pipeline.process({
       rawBody: loadFixture("admission-medicare-inpatient.json"),
@@ -160,9 +126,14 @@ describe("Pipeline FHIR → Decision", () => {
       correlationId: "NOA-20260909-000123",
     });
 
-    expect(result.processingState).toBe("EVALUATED");
+    expect(result.processingState).toBe("ACKNOWLEDGED");
     expect(result.decision?.decision).toBe("SEND_NOA");
     expect(result.decision?.ruleVersions).toContain("MEDICARE_INPATIENT_NOA@1");
+    expect(result.routing?.contractBusinessId).toBe("MEDICARE_NOA_MOCK_V1");
+    expect(result.transformation?.payload.patient).toMatchObject({
+      lastName: "SYNTHETIC",
+    });
+    expect(result.acknowledgement?.ackId).toBeTruthy();
 
     const trail = await audit.listByCorrelationId(result.correlationId);
     expect(trail.map((e) => e.action)).toEqual([
@@ -171,41 +142,18 @@ describe("Pipeline FHIR → Decision", () => {
       "NORMALIZED",
       "RULES_EVALUATED",
       "DECISION_CREATED",
+      "CONTRACT_SELECTED",
+      "TRANSFORM_EXECUTED",
+      "DELIVERY_STARTED",
+      "DELIVERY_ATTEMPTED",
+      "DELIVERY_SUCCEEDED",
+      "ACKNOWLEDGEMENT_RECEIVED",
     ]);
   });
 
-  it("outpatient fixture yields NO_NOA_REQUIRED", async () => {
+  it("outpatient fixture yields NO_NOA_REQUIRED without routing", async () => {
     const clock = new FixedClock(new Date("2026-09-09T18:00:00.000Z"));
-    const events = new InMemoryEventRepository();
-    const admissions = new InMemoryAdmissionEventRepository();
-    const audit = new InMemoryAuditPort();
-    const decisions = new InMemoryDecisionRepository();
-    const executions = new InMemoryRuleExecutionRepository();
-    const rules = new InMemoryRuleRepository();
-    rules.seed(createSeedRuleVersions());
-    const logger = new MemoryLogger();
-
-    const pipeline = new DefaultNoaPipeline(
-      new FhirIngestionService({
-        ids: new SequentialIdGenerator(clock),
-        clock,
-        logger,
-        events,
-        admissions,
-        audit,
-        validator: new AdmissionFhirValidator(),
-        normalizer: new AdmissionNormalizationService(),
-      }),
-      new DecisioningService({
-        clock,
-        logger,
-        rulesEngine: new ConfigurableRulesEngine(rules),
-        events,
-        decisions,
-        executions,
-        audit,
-      })
-    );
+    const { pipeline, audit } = createTestPipeline(clock, new MemoryLogger());
 
     const result = await pipeline.process({
       rawBody: loadFixture("admission-outpatient-no-noa.json"),

@@ -127,7 +127,8 @@ export interface ContractRegistry {
 export interface TransformationEngine {
   transform(
     event: AdmissionEvent,
-    definition: TransformationDefinition
+    definition: TransformationDefinition,
+    decision?: Decision
   ): Promise<TransformResult>;
 }
 
@@ -146,6 +147,7 @@ export interface DeliveryService {
     decision: Decision;
     routing: RoutingResult;
     payload: Record<string, unknown>;
+    decisionRecord?: DecisionRecord;
   }): Promise<DeliveryOutcome>;
 }
 
@@ -154,6 +156,23 @@ export interface PipelineResult {
   correlationId: CorrelationId;
   processingState: ProcessingState;
   decision?: Decision;
+  routing?: {
+    contractBusinessId: string;
+    destinationCode: string;
+    adapterKey: string;
+    transformerCode: string;
+  };
+  transformation?: {
+    transformerCode: string;
+    payload: Record<string, unknown>;
+  };
+  delivery?: {
+    notificationId: string;
+    adapterKey: string;
+    attempts: number;
+    acknowledgement?: { acknowledgedAt: string; ackId?: string };
+    deadLetter?: boolean;
+  };
   acknowledgement?: { acknowledgedAt: string; ackId?: string };
   errors?: Array<{ code: string; message: string }>;
 }
@@ -164,5 +183,7 @@ export interface NoaPipeline {
     contentType: string;
     correlationId?: string;
     sourceSystem?: string;
+    /** Demo override: MEDICARE_NOA_SF_V1 | MEDICARE_NOA_PEGA_V1 | … */
+    contractBusinessId?: string;
   }): Promise<PipelineResult>;
 }

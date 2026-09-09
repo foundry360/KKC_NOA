@@ -46,9 +46,11 @@ supabase db push
 
 ## Current cascade status
 
-**Step 5 — Rules** complete (through `EVALUATED` / Decision).
+**Steps 1–11 complete** for the POC definition of done.
 
-Next: **Step 6 — Contracts** (Decision → Contract / destination).
+Golden path: FHIR → validate → normalize → rules → decide → route → transform → deliver → acknowledge → audit.
+
+Vendor-agnostic: same event → Salesforce or Pega via `X-Contract-Id` only.
 
 ## Security note
 

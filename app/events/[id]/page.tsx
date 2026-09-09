@@ -11,13 +11,29 @@ export default async function EventDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const { events, admissions, audit, decisions, executions } = getIngestRuntime();
+  const {
+    events,
+    admissions,
+    audit,
+    decisions,
+    executions,
+    selections,
+    transformResults,
+    notifications,
+    attempts,
+  } = getIngestRuntime();
   const event = await events.findById(id);
   if (!event) notFound();
 
   const admission = await admissions.findByEventId(event.id);
   const decision = await decisions.findByEventId(event.id);
   const execution = await executions.findByEventId(event.id);
+  const selection = await selections.findByEventId(event.id);
+  const transform = await transformResults.findByEventId(event.id);
+  const notification = await notifications.findByEventId(event.id);
+  const deliveryAttempts = notification
+    ? await attempts.listByNotificationId(notification.id)
+    : [];
   const trail = await audit.listByCorrelationId(event.correlationId);
 
   return (
@@ -158,6 +174,112 @@ export default async function EventDetailPage({
         ) : (
           <p className="text-sm text-black/60 dark:text-white/60">
             No decision recorded for this event.
+          </p>
+        )}
+      </section>
+
+      <section className="mb-8 space-y-2">
+        <h2 className="text-lg font-semibold">Contract / Routing</h2>
+        {selection ? (
+          <dl className="grid gap-2 text-sm sm:grid-cols-2">
+            <div>
+              <dt className="text-black/50 dark:text-white/50">Contract</dt>
+              <dd className="font-mono text-xs">{selection.contractBusinessId}</dd>
+            </div>
+            <div>
+              <dt className="text-black/50 dark:text-white/50">Destination</dt>
+              <dd>{selection.destinationCode}</dd>
+            </div>
+            <div>
+              <dt className="text-black/50 dark:text-white/50">Adapter</dt>
+              <dd>{selection.adapterKey}</dd>
+            </div>
+            <div>
+              <dt className="text-black/50 dark:text-white/50">Transformer</dt>
+              <dd className="font-mono text-xs">{selection.transformerCode}</dd>
+            </div>
+          </dl>
+        ) : (
+          <p className="text-sm text-black/60 dark:text-white/60">
+            No contract selected
+            {event.processingState === "NO_CONTRACT"
+              ? " (NO_CONTRACT)"
+              : event.processingState === "EVALUATED" &&
+                  decision?.decision === "NO_NOA_REQUIRED"
+                ? " (NOA not required)"
+                : ""}
+            .
+          </p>
+        )}
+      </section>
+
+      <section className="mb-8 space-y-2">
+        <h2 className="text-lg font-semibold">Transformation</h2>
+        {transform ? (
+          <div className="space-y-3 text-sm">
+            <p className="font-mono text-xs text-black/60 dark:text-white/60">
+              {transform.transformerCode}@v{transform.transformerVersion}
+            </p>
+            <div>
+              <p className="mb-1 text-black/50 dark:text-white/50">
+                Destination payload
+              </p>
+              <pre className="overflow-x-auto rounded-md bg-black/[0.04] p-3 font-mono text-xs dark:bg-white/[0.06]">
+                {JSON.stringify(transform.payload, null, 2)}
+              </pre>
+            </div>
+            <div>
+              <p className="mb-1 text-black/50 dark:text-white/50">
+                Mapping trace
+              </p>
+              <pre className="overflow-x-auto rounded-md bg-black/[0.04] p-3 font-mono text-xs dark:bg-white/[0.06]">
+                {JSON.stringify(transform.mappingTrace, null, 2)}
+              </pre>
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm text-black/60 dark:text-white/60">
+            No destination payload
+            {event.processingState === "TRANSFORM_FAILED"
+              ? " (TRANSFORM_FAILED)"
+              : ""}
+            .
+          </p>
+        )}
+      </section>
+
+      <section className="mb-8 space-y-2">
+        <h2 className="text-lg font-semibold">Delivery</h2>
+        {notification ? (
+          <div className="space-y-3 text-sm">
+            <dl className="grid gap-2 sm:grid-cols-2">
+              <div>
+                <dt className="text-black/50 dark:text-white/50">Status</dt>
+                <dd>{notification.status}</dd>
+              </div>
+              <div>
+                <dt className="text-black/50 dark:text-white/50">Adapter</dt>
+                <dd>{notification.adapterKey}</dd>
+              </div>
+              <div>
+                <dt className="text-black/50 dark:text-white/50">Attempts</dt>
+                <dd>{deliveryAttempts.length}</dd>
+              </div>
+              <div>
+                <dt className="text-black/50 dark:text-white/50">Ack ID</dt>
+                <dd className="font-mono text-xs">
+                  {deliveryAttempts.find((a) => a.acknowledgement)?.acknowledgement
+                    ?.ackId ?? "—"}
+                </dd>
+              </div>
+            </dl>
+            <pre className="overflow-x-auto rounded-md bg-black/[0.04] p-3 font-mono text-xs dark:bg-white/[0.06]">
+              {JSON.stringify(deliveryAttempts, null, 2)}
+            </pre>
+          </div>
+        ) : (
+          <p className="text-sm text-black/60 dark:text-white/60">
+            No delivery recorded.
           </p>
         )}
       </section>

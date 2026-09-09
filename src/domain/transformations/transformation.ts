@@ -3,7 +3,7 @@ export interface FieldMapping {
   targetPath: string;
   required?: boolean;
   defaultValue?: unknown;
-  transform?: "passthrough" | "uppercase" | "dateIso";
+  transform?: "passthrough" | "uppercase" | "dateIso" | "first" | "join";
 }
 
 export interface TransformationDefinition {

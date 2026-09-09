@@ -1,0 +1,8 @@
+{
+  "contractId": "MEDICARE_NOA_PEGA_V1",
+  "name": "Medicare NOA → Pega",
+  "payer": "MEDICARE",
+  "destination": "PEGA_NOA_CASE",
+  "adapterKey": "pega",
+  "transformer": "MEDICARE_NOA_PEGA_TRANSFORM"
+}

@@ -38,7 +38,7 @@ export default function HomePage() {
         </section>
 
         <p className="font-mono text-xs text-black/50 dark:text-white/50">
-          Foundation complete · FHIR ingest next · See /docs
+          POC cascade complete · FHIR → ACKNOWLEDGED · See /docs
         </p>
       </div>
     </AppShell>

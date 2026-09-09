@@ -1,0 +1,15 @@
+{
+  "code": "MEDICARE_NOA_MOCK_TRANSFORM",
+  "version": 1,
+  "sourceModel": "AdmissionEvent",
+  "targetFormat": "JSON",
+  "mappings": [
+    { "sourcePath": "notificationType", "targetPath": "notificationType", "required": true },
+    { "sourcePath": "admission.admissionDateTime", "targetPath": "admissionDateTime", "required": true, "transform": "dateIso" },
+    { "sourcePath": "patient.name.family", "targetPath": "patient.lastName", "required": true },
+    { "sourcePath": "patient.name.given", "targetPath": "patient.firstName", "required": false, "transform": "first" },
+    { "sourcePath": "encounter.class", "targetPath": "encounterClass", "required": true },
+    { "sourcePath": "payer.payerType", "targetPath": "payerType", "required": true },
+    { "sourcePath": "correlationId", "targetPath": "correlationId", "required": true }
+  ]
+}

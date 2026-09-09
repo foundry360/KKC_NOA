@@ -1,0 +1,18 @@
+{
+  "contractId": "MEDICARE_NOA_MOCK_V1",
+  "name": "Medicare NOA → Mock Payer",
+  "payer": "MEDICARE",
+  "product": "NOA",
+  "version": 1,
+  "payloadFormat": "JSON",
+  "transport": "REST",
+  "destination": "MOCK_PAYER",
+  "adapterKey": "mock",
+  "transformer": "MEDICARE_NOA_MOCK_TRANSFORM",
+  "acknowledgementType": "HTTP_200_BODY",
+  "retryPolicy": {
+    "maxAttempts": 3,
+    "backoffMs": [1000, 5000, 15000],
+    "deadLetterAfterMax": true
+  }
+}

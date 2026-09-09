@@ -2,9 +2,9 @@
 
 ## Current State
 
-- Repository is **empty** (greenfield). No Next.js app, Supabase config, or existing UI.
-- **No conflicts** with the target architecture.
+- **POC cascade Steps 1–11 complete.** Next.js app, in-memory runtime, Admin UI, and e2e golden path are in place.
 - Architecture documentation foundation is in `/docs`.
+- Runtime still uses process-local in-memory stores; Supabase schema exists for a later cutover.
 
 ## Documentation Created
 
@@ -56,37 +56,40 @@ Deferred to Foundation/Ingestion: `docs/API_CONTRACT.md`.
 - `DefaultNoaPipeline`: FHIR → … → Decision
 - Demo: AdmissionEvent → NOA Decision
 
-### Step 6 — Contracts
+### Step 6 — Contracts ✅
 
-- Registry + destinations + selection
-- Seed mock / SF / Pega contracts
-- Demo: Decision → Contract
+- Contract registry + destinations + stub transformers
+- Seed Mock / Salesforce / Pega Medicare NOA contracts
+- Routing after `SEND_NOA` → `ROUTED` (or `NO_CONTRACT`)
+- Demo: Decision → Contract; SF/Pega via `X-Contract-Id`
 
-### Step 7 — Transform
+### Step 7 — Transform ✅
 
-- Mapping engine + versions
+- Simple field-mapping engine + Mock/SF/Pega mapping seeds
+- Persist destination payload + mapping trace
+- Pipeline through `TRANSFORMED` (or `TRANSFORM_FAILED`)
 - Demo: AdmissionEvent → destination payload
 
-### Step 8 — Delivery
+### Step 8 — Delivery ✅
 
-- `DeliveryService` + Mock + REST adapters
-- Attempts, ack, retry, dead letter
-- Demo: payload → downstream
+- Mock + REST adapters; Salesforce/Pega stubs wrapping Mock
+- Delivery attempts, ack, in-process retry, dead letter
+- Pipeline through `ACKNOWLEDGED`
 
-### Step 9 — Salesforce / Pega Abstractions
+### Step 9 — Salesforce / Pega Abstractions ✅
 
-- Mock SF/Pega adapters
-- Dual-contract demo without core changes
+- Mock SF/Pega adapters (envelope wrappers; no live credentials)
+- Dual-contract demo via `X-Contract-Id` without core engine changes
 
-### Step 10 — Admin UI
+### Step 10 — Admin UI ✅
 
-- Nav shell + Dashboard + lists
-- **Event Detail** prioritized (full journey)
+- Dashboard metrics from persisted records
+- Events + Event Detail (full journey)
+- Rules, Contracts, Transformations, Destinations, Deliveries, Audit
 
-### Step 11 — End-to-End
+### Step 11 — End-to-End ✅
 
-- Automated golden path + exception tests
-- Playwright smoke as appropriate
+- Automated golden path + vendor routing + exception coverage (`tests/e2e`)
 
 ## Quality Gate (Every Step)
 
@@ -108,8 +111,9 @@ Deferred to Foundation/Ingestion: `docs/API_CONTRACT.md`.
 
 ## Next Action
 
-**Step 5 — Rules is complete.** Proceed to **Step 6 — Contracts**:
+**POC cascade Steps 1–11 are complete.** Optional follow-ups:
 
-- Contract registry + destinations + selection
-- Seed mock / SF / Pega contracts
-- Demonstrate Decision → Contract
+- Wire Supabase-backed repositories (replace in-memory)
+- Playwright browser smoke tests
+- Commit/push remaining local changes
+- Harden production controls per `SECURITY.md` / `AWS_PRODUCTION_ARCHITECTURE.md`

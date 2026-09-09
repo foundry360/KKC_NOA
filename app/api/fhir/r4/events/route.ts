@@ -44,7 +44,7 @@ export async function GET() {
     endpoint: "/api/fhir/r4/events",
     status: "ready",
     accepts: ["application/fhir+json", "application/json"],
-    pipelineThrough: "EVALUATED",
+    pipelineThrough: "ACKNOWLEDGED",
   });
 }
 
@@ -55,6 +55,8 @@ export async function POST(request: NextRequest) {
   const contentType = request.headers.get("content-type") ?? "";
   const correlationHeader = request.headers.get("x-correlation-id") ?? undefined;
   const sourceSystem = request.headers.get("x-source-system") ?? undefined;
+  const contractBusinessId =
+    request.headers.get("x-contract-id") ?? undefined;
 
   let rawBody: unknown;
   try {
@@ -78,6 +80,7 @@ export async function POST(request: NextRequest) {
       contentType,
       correlationId: correlationHeader,
       sourceSystem,
+      contractBusinessId,
     });
 
     const admission = await admissions.findByEventId(result.eventId);
@@ -109,6 +112,14 @@ export async function POST(request: NextRequest) {
             },
           }
         : {}),
+      ...(result.routing ? { routing: result.routing } : {}),
+      ...(result.transformation
+        ? { transformation: result.transformation }
+        : {}),
+      ...(result.delivery ? { delivery: result.delivery } : {}),
+      ...(result.acknowledgement
+        ? { acknowledgement: result.acknowledgement }
+        : {}),
       ...(result.errors ? { errors: result.errors } : {}),
     };
 
@@ -119,7 +130,12 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    if (result.processingState === "RULE_REJECTED") {
+    if (
+      result.processingState === "RULE_REJECTED" ||
+      result.processingState === "NO_CONTRACT" ||
+      result.processingState === "TRANSFORM_FAILED" ||
+      result.processingState === "DEAD_LETTER"
+    ) {
       return NextResponse.json(body, {
         status: 200,
         headers: { "X-Correlation-Id": result.correlationId },
