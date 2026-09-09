@@ -3,9 +3,9 @@ import { getIngestRuntime } from "@/src/infrastructure/composition/ingest";
 
 export const dynamic = "force-dynamic";
 
-export default function RulesPage() {
-  const { rules } = getIngestRuntime();
-  const versions = rules.listAll();
+export default async function RulesPage() {
+  const { rules } = await getIngestRuntime();
+  const versions = await rules.listAll();
 
   return (
     <AppShell title="Rules">

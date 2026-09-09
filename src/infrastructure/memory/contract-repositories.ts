@@ -33,7 +33,7 @@ export class InMemoryDestinationRepository implements DestinationRepository {
     return found ? structuredClone(found) : null;
   }
 
-  listAll(): DestinationConfig[] {
+  async listAll(): Promise<DestinationConfig[]> {
     return Array.from(this.byId.values()).map((d) => structuredClone(d));
   }
 
@@ -78,7 +78,7 @@ export class InMemoryContractRepository implements ContractRepository {
       .map((v) => structuredClone(v));
   }
 
-  listAll(): ContractVersionRecord[] {
+  async listAll(): Promise<ContractVersionRecord[]> {
     return this.versions.map((v) => structuredClone(v));
   }
 
@@ -112,7 +112,7 @@ export class InMemoryTransformationRepository implements TransformationRepositor
     return latest ? structuredClone(latest) : null;
   }
 
-  listAll(): TransformationDefinition[] {
+  async listAll(): Promise<TransformationDefinition[]> {
     return Array.from(this.byCode.values())
       .flat()
       .map((d) => structuredClone(d));

@@ -3,10 +3,12 @@ import { getIngestRuntime } from "@/src/infrastructure/composition/ingest";
 
 export const dynamic = "force-dynamic";
 
-export default function ContractsPage() {
-  const { contracts, destinations } = getIngestRuntime();
-  const versions = contracts.listAll();
-  const destById = new Map(destinations.listAll().map((d) => [d.id, d]));
+export default async function ContractsPage() {
+  const { contracts, destinations } = await getIngestRuntime();
+  const versions = await contracts.listAll();
+  const destById = new Map(
+    (await destinations.listAll()).map((d) => [d.id, d])
+  );
 
   return (
     <AppShell title="Contracts">

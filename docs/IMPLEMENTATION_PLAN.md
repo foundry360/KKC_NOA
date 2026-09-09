@@ -111,9 +111,10 @@ Deferred to Foundation/Ingestion: `docs/API_CONTRACT.md`.
 
 ## Next Action
 
-**POC cascade Steps 1–11 are complete.** Optional follow-ups:
+**POC cascade Steps 1–11 are complete.** Persistence cutover: Supabase repositories are wired when service-role env is present (else in-memory).
 
-- Wire Supabase-backed repositories (replace in-memory)
+Optional follow-ups:
+
+- Apply migrations (`supabase db push`) against a linked project and verify Dashboard survives restart
 - Playwright browser smoke tests
-- Commit/push remaining local changes
 - Harden production controls per `SECURITY.md` / `AWS_PRODUCTION_ARCHITECTURE.md`

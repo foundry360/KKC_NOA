@@ -1,7 +1,9 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
-import { createIngestRuntime } from "@/src/infrastructure/composition/ingest";
+import {
+  createMemoryIngestRuntime,
+} from "@/src/infrastructure/composition/ingest";
 import { FixedClock } from "@/src/utils/clock";
 import { SequentialIdGenerator } from "@/src/utils/id-generator";
 import { MemoryLogger } from "@/src/utils/logger";
@@ -104,11 +106,12 @@ describe("FhirIngestionService integration", () => {
   });
 
   it("composition runtime wires a working ingestion service", async () => {
-    const runtime = createIngestRuntime();
+    const runtime = await createMemoryIngestRuntime();
     const result = await runtime.ingestion.ingest({
       rawBody: loadFixture("admission-medicare-inpatient.json"),
       contentType: "application/fhir+json",
     });
     expect(result.processingState).toBe("NORMALIZED");
+    expect(runtime.persistence).toBe("memory");
   });
 });

@@ -5,8 +5,8 @@ import { getIngestRuntime } from "@/src/infrastructure/composition/ingest";
 export const dynamic = "force-dynamic";
 
 export default async function DeliveriesPage() {
-  const { notifications, attempts } = getIngestRuntime();
-  const list = notifications.listAll();
+  const { notifications, attempts } = await getIngestRuntime();
+  const list = await notifications.listAll();
 
   return (
     <AppShell title="Deliveries">

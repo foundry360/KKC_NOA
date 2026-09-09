@@ -6,7 +6,7 @@ import { computeDashboardMetrics } from "@/src/services/metrics/dashboard-metric
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const { events, decisions, notifications, audit } = getIngestRuntime();
+  const { events, decisions, notifications, audit } = await getIngestRuntime();
   const recentEvents = await events.listRecent(100);
   const decisionList = await Promise.all(
     recentEvents.map((e) => decisions.findByEventId(e.id))
@@ -14,7 +14,7 @@ export default async function DashboardPage() {
   const metrics = computeDashboardMetrics({
     events: recentEvents,
     decisions: decisionList.filter((d): d is NonNullable<typeof d> => Boolean(d)),
-    notifications: notifications.listAll(),
+    notifications: await notifications.listAll(),
   });
   const activity = await audit.listRecent(12);
 

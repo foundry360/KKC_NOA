@@ -5,7 +5,7 @@ import { getIngestRuntime } from "@/src/infrastructure/composition/ingest";
 export const dynamic = "force-dynamic";
 
 export default async function AuditPage() {
-  const { audit, events } = getIngestRuntime();
+  const { audit, events } = await getIngestRuntime();
   const entries = await audit.listRecent(100);
 
   return (

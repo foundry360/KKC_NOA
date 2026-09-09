@@ -52,6 +52,8 @@ Golden path: FHIR → validate → normalize → rules → decide → route → 
 
 Vendor-agnostic: same event → Salesforce or Pega via `X-Contract-Id` only.
 
+**Persistence:** set `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` to use Supabase repositories (config seed upserted on boot). Without them, the runtime stays in-memory.
+
 ## Security note
 
 Synthetic data only. This POC is **not** HIPAA compliant. See [SECURITY.md](./docs/SECURITY.md).

@@ -21,7 +21,7 @@ export default async function EventDetailPage({
     transformResults,
     notifications,
     attempts,
-  } = getIngestRuntime();
+  } = await getIngestRuntime();
   const event = await events.findById(id);
   if (!event) notFound();
 

@@ -41,6 +41,11 @@ import { DefaultContractRegistry } from "@/src/services/routing/contract-registr
 import { RoutingService } from "@/src/services/routing/routing-service";
 import { SimpleMappingTransformationEngine } from "@/src/services/transformation/mapping-engine";
 import { TransformationService } from "@/src/services/transformation/transformation-service";
+import { createSupabaseServiceClient } from "@/src/infrastructure/supabase/client";
+import {
+  createSupabaseStores,
+  type RuntimeStores,
+} from "@/src/infrastructure/supabase/stores";
 import { SystemClock } from "@/src/utils/clock";
 import { DefaultIdGenerator } from "@/src/utils/id-generator";
 import { ConsoleLogger } from "@/src/utils/logger";
@@ -52,32 +57,19 @@ export type IngestRuntime = {
   routing: RoutingService;
   transformation: TransformationService;
   delivery: DefaultDeliveryService;
-  events: InMemoryEventRepository;
-  admissions: InMemoryAdmissionEventRepository;
-  audit: InMemoryAuditPort;
-  decisions: InMemoryDecisionRepository;
-  rules: InMemoryRuleRepository;
-  executions: InMemoryRuleExecutionRepository;
-  contracts: InMemoryContractRepository;
-  destinations: InMemoryDestinationRepository;
-  transformations: InMemoryTransformationRepository;
-  selections: InMemoryRoutingSelectionRepository;
-  transformResults: InMemoryTransformationResultRepository;
-  notifications: InMemoryNotificationRepository;
-  attempts: InMemoryDeliveryAttemptRepository;
-  deadLetters: InMemoryDeadLetterRepository;
-};
+  persistence: "memory" | "supabase";
+} & RuntimeStores;
 
 /** Bump when singleton shape changes so Next.js HMR does not reuse a stale store. */
-const RUNTIME_VERSION = 9;
+const RUNTIME_VERSION = 10;
 
 const globalStore = globalThis as typeof globalThis & {
   __noaIngestRuntime?: IngestRuntime;
   __noaRuntimeVersion?: number;
+  __noaRuntimeInit?: Promise<IngestRuntime>;
 };
 
-export function createIngestRuntime(): IngestRuntime {
-  const clock = new SystemClock();
+function createMemoryStores(): RuntimeStores {
   const events = new InMemoryEventRepository();
   const admissions = new InMemoryAdmissionEventRepository();
   const audit = new InMemoryAuditPort();
@@ -98,6 +90,29 @@ export function createIngestRuntime(): IngestRuntime {
   const attempts = new InMemoryDeliveryAttemptRepository();
   const deadLetters = new InMemoryDeadLetterRepository();
 
+  return {
+    events,
+    admissions,
+    audit,
+    decisions,
+    executions,
+    rules,
+    contracts,
+    destinations,
+    transformations,
+    selections,
+    transformResults,
+    notifications,
+    attempts,
+    deadLetters,
+  };
+}
+
+function wireRuntime(
+  stores: RuntimeStores,
+  persistence: "memory" | "supabase"
+): IngestRuntime {
+  const clock = new SystemClock();
   const logger = new ConsoleLogger("fhir-noa");
   const ids = new DefaultIdGenerator(clock);
 
@@ -105,9 +120,9 @@ export function createIngestRuntime(): IngestRuntime {
     ids,
     clock,
     logger,
-    events,
-    admissions,
-    audit,
+    events: stores.events,
+    admissions: stores.admissions,
+    audit: stores.audit,
     validator: new AdmissionFhirValidator(),
     normalizer: new AdmissionNormalizationService(),
   });
@@ -115,17 +130,17 @@ export function createIngestRuntime(): IngestRuntime {
   const decisioning = new DecisioningService({
     clock,
     logger,
-    rulesEngine: new ConfigurableRulesEngine(rules),
-    events,
-    decisions,
-    executions,
-    audit,
+    rulesEngine: new ConfigurableRulesEngine(stores.rules),
+    events: stores.events,
+    decisions: stores.decisions,
+    executions: stores.executions,
+    audit: stores.audit,
   });
 
   const registry = new DefaultContractRegistry(
-    contracts,
-    destinations,
-    transformations,
+    stores.contracts,
+    stores.destinations,
+    stores.transformations,
     process.env.DEFAULT_NOA_CONTRACT ?? DEFAULT_NOA_CONTRACT_BUSINESS_ID
   );
 
@@ -133,18 +148,18 @@ export function createIngestRuntime(): IngestRuntime {
     clock,
     logger,
     registry,
-    events,
-    selections,
-    audit,
+    events: stores.events,
+    selections: stores.selections,
+    audit: stores.audit,
   });
 
   const transformation = new TransformationService({
     clock,
     logger,
     engine: new SimpleMappingTransformationEngine(),
-    events,
-    results: transformResults,
-    audit,
+    events: stores.events,
+    results: stores.transformResults,
+    audit: stores.audit,
   });
 
   const adapters = new DefaultDeliveryAdapterRegistry();
@@ -158,11 +173,11 @@ export function createIngestRuntime(): IngestRuntime {
     clock,
     logger,
     adapters,
-    events,
-    notifications,
-    attempts,
-    deadLetters,
-    audit,
+    events: stores.events,
+    notifications: stores.notifications,
+    attempts: stores.attempts,
+    deadLetters: stores.deadLetters,
+    audit: stores.audit,
   });
 
   const pipeline = new DefaultNoaPipeline(
@@ -180,38 +195,54 @@ export function createIngestRuntime(): IngestRuntime {
     routing,
     transformation,
     delivery,
-    events,
-    admissions,
-    audit,
-    decisions,
-    rules,
-    executions,
-    contracts,
-    destinations,
-    transformations,
-    selections,
-    transformResults,
-    notifications,
-    attempts,
-    deadLetters,
+    persistence,
+    ...stores,
   };
 }
 
-export function getIngestRuntime(): IngestRuntime {
+/** Prefer Supabase service role when configured; otherwise process-local memory. */
+export async function createIngestRuntime(): Promise<IngestRuntime> {
+  const client = createSupabaseServiceClient();
+  if (client) {
+    const stores = await createSupabaseStores(client);
+    return wireRuntime(stores, "supabase");
+  }
+  return wireRuntime(createMemoryStores(), "memory");
+}
+
+/** Sync memory-only factory for unit/integration tests that must not hit Supabase. */
+export function createMemoryIngestRuntime(): IngestRuntime {
+  return wireRuntime(createMemoryStores(), "memory");
+}
+
+export async function getIngestRuntime(): Promise<IngestRuntime> {
   const existing = globalStore.__noaIngestRuntime;
   const stale =
     !existing ||
     globalStore.__noaRuntimeVersion !== RUNTIME_VERSION ||
     typeof existing.audit.listRecent !== "function";
 
-  if (stale) {
-    globalStore.__noaIngestRuntime = createIngestRuntime();
-    globalStore.__noaRuntimeVersion = RUNTIME_VERSION;
+  if (!stale) {
+    return existing;
   }
-  return globalStore.__noaIngestRuntime!;
+
+  if (!globalStore.__noaRuntimeInit) {
+    globalStore.__noaRuntimeInit = createIngestRuntime()
+      .then((runtime) => {
+        globalStore.__noaIngestRuntime = runtime;
+        globalStore.__noaRuntimeVersion = RUNTIME_VERSION;
+        return runtime;
+      })
+      .finally(() => {
+        globalStore.__noaRuntimeInit = undefined;
+      });
+  }
+
+  return globalStore.__noaRuntimeInit;
 }
 
 export function setIngestRuntime(runtime: IngestRuntime | undefined): void {
   globalStore.__noaIngestRuntime = runtime;
   globalStore.__noaRuntimeVersion = runtime ? RUNTIME_VERSION : undefined;
+  globalStore.__noaRuntimeInit = undefined;
 }

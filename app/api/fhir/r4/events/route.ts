@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { pipeline, admissions } = getIngestRuntime();
+    const { pipeline, admissions } = await getIngestRuntime();
     const result = await pipeline.process({
       rawBody,
       contentType,

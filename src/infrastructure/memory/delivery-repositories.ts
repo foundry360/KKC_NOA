@@ -37,7 +37,7 @@ export class InMemoryNotificationRepository implements NotificationRepository {
     return found ? structuredClone(found) : null;
   }
 
-  listAll(): NotificationRecord[] {
+  async listAll(): Promise<NotificationRecord[]> {
     return Array.from(this.byId.values()).map((n) => structuredClone(n));
   }
 
@@ -78,7 +78,7 @@ export class InMemoryDeadLetterRepository implements DeadLetterRepository {
     this.items.push(structuredClone(entry));
   }
 
-  listAll(): DeadLetterRecord[] {
+  async listAll(): Promise<DeadLetterRecord[]> {
     return this.items.map((i) => structuredClone(i));
   }
 

@@ -3,9 +3,9 @@ import { getIngestRuntime } from "@/src/infrastructure/composition/ingest";
 
 export const dynamic = "force-dynamic";
 
-export default function TransformationsPage() {
-  const { transformations } = getIngestRuntime();
-  const list = transformations.listAll();
+export default async function TransformationsPage() {
+  const { transformations } = await getIngestRuntime();
+  const list = await transformations.listAll();
 
   return (
     <AppShell title="Transformations">

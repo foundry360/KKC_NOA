@@ -121,7 +121,7 @@ describe("E2E golden path and exceptions", () => {
     const metrics = computeDashboardMetrics({
       events: allEvents,
       decisions: allDecisions,
-      notifications: notifications.listAll(),
+      notifications: await notifications.listAll(),
     });
 
     expect(metrics.eventsReceived).toBe(3);

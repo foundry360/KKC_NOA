@@ -5,14 +5,15 @@ import { getIngestRuntime } from "@/src/infrastructure/composition/ingest";
 export const dynamic = "force-dynamic";
 
 export default async function EventsPage() {
-  const { events, admissions, decisions } = getIngestRuntime();
+  const { events, admissions, decisions } = await getIngestRuntime();
   const recent = await events.listRecent(25);
 
   return (
     <AppShell title="Events">
       <p className="mb-6 text-black/70 dark:text-white/70">
-        Inbound FHIR events persisted through the ingest pipeline. Persistence is
-        process-local until Supabase repositories are wired.
+        Inbound FHIR events. Uses Supabase when{" "}
+        <code className="font-mono text-xs">SUPABASE_SERVICE_ROLE_KEY</code> is
+        set; otherwise process-local memory.
       </p>
 
       {recent.length === 0 ? (

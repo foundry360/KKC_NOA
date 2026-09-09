@@ -3,9 +3,9 @@ import { getIngestRuntime } from "@/src/infrastructure/composition/ingest";
 
 export const dynamic = "force-dynamic";
 
-export default function DestinationsPage() {
-  const { destinations } = getIngestRuntime();
-  const list = destinations.listAll();
+export default async function DestinationsPage() {
+  const { destinations } = await getIngestRuntime();
+  const list = await destinations.listAll();
 
   return (
     <AppShell title="Destinations">

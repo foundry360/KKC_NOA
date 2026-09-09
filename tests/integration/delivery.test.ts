@@ -192,7 +192,7 @@ describe("DeliveryService retry + dead letter", () => {
 
     expect(result.processingState).toBe("DEAD_LETTER");
     expect(result.outcome?.attempts).toHaveLength(3);
-    expect(deadLetters.listAll()).toHaveLength(1);
+    expect(await deadLetters.listAll()).toHaveLength(1);
     expect((await events.findById(admission.eventId))?.processingState).toBe(
       "DEAD_LETTER"
     );

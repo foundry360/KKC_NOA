@@ -31,7 +31,7 @@ export class InMemoryRuleRepository implements RuleRepository {
       .map((v) => structuredClone(v));
   }
 
-  listAll(): RuleVersion[] {
+  async listAll(): Promise<RuleVersion[]> {
     return this.versions.map((v) => structuredClone(v));
   }
 
