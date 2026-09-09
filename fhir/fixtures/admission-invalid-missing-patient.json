@@ -1,0 +1,45 @@
+{
+  "resourceType": "Bundle",
+  "id": "synthetic-admission-invalid-missing-patient",
+  "type": "message",
+  "timestamp": "2026-09-09T14:30:00Z",
+  "entry": [
+    {
+      "resource": {
+        "resourceType": "MessageHeader",
+        "id": "message-header-bad",
+        "eventCoding": {
+          "code": "A01"
+        },
+        "source": {
+          "name": "Synthetic EHR"
+        }
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Encounter",
+        "id": "encounter-bad",
+        "status": "in-progress",
+        "class": {
+          "code": "IMP"
+        },
+        "period": {
+          "start": "2026-09-09T14:30:00Z"
+        }
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Coverage",
+        "id": "coverage-bad",
+        "status": "active",
+        "payor": [
+          {
+            "display": "Unknown Payer"
+          }
+        ]
+      }
+    }
+  ]
+}

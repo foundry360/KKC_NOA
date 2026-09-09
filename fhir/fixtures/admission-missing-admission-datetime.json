@@ -1,0 +1,38 @@
+{
+  "resourceType": "Bundle",
+  "id": "synthetic-admission-missing-period",
+  "type": "collection",
+  "timestamp": "2026-09-09T14:30:00Z",
+  "entry": [
+    {
+      "resource": {
+        "resourceType": "Patient",
+        "id": "patient-002",
+        "name": [{ "family": "SYNTHETIC", "given": ["ALAN"] }]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Encounter",
+        "id": "encounter-002",
+        "status": "in-progress",
+        "class": { "code": "IMP" }
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Coverage",
+        "id": "coverage-002",
+        "status": "active",
+        "payor": [{ "display": "Synthetic Medicare" }]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Organization",
+        "id": "facility-002",
+        "name": "Synthetic Clinic"
+      }
+    }
+  ]
+}

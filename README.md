@@ -1,36 +1,55 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# FHIR NOA Accelerator
 
-## Getting Started
+Healthcare **integration and orchestration** proof of concept for Notification of Admission (NOA).
 
-First, run the development server:
-
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+```
+FHIR In → Validation → Canonical Event → Rules → Decision
+  → Routing → Contract → Transform → Delivery → Ack → Audit
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Salesforce and Pega are **delivery adapters**, not the platform core.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Documentation
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Architecture contracts live in [`docs/`](./docs/):
 
-## Learn More
+- [POC Scope](./docs/POC_SCOPE.md)
+- [Architecture](./docs/ARCHITECTURE.md)
+- [Domain Model](./docs/DOMAIN_MODEL.md)
+- [Implementation Plan](./docs/IMPLEMENTATION_PLAN.md)
 
-To learn more about Next.js, take a look at the following resources:
+## Stack (POC)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- Next.js (App Router) + TypeScript
+- Supabase PostgreSQL + Auth
+- Vitest
+- Vercel-ready; domain layer portable to AWS
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Getting started
 
-## Deploy on Vercel
+```bash
+cp .env.example .env.local
+npm install
+npm run dev
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+npm run quality   # typecheck + lint + tests
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Apply database migrations with the Supabase CLI when a project is linked:
+
+```bash
+supabase db push
+# or: supabase migration up
+```
+
+## Current cascade status
+
+**Step 4 — FHIR Ingestion** complete (through `NORMALIZED`).
+
+Next: **Step 5 — Rules** (AdmissionEvent → NOA Decision).
+
+## Security note
+
+Synthetic data only. This POC is **not** HIPAA compliant. See [SECURITY.md](./docs/SECURITY.md).
