@@ -68,7 +68,8 @@ export type IngestRuntime = {
   deadLetters: InMemoryDeadLetterRepository;
 };
 
-const RUNTIME_VERSION = 8;
+/** Bump when singleton shape changes so Next.js HMR does not reuse a stale store. */
+const RUNTIME_VERSION = 9;
 
 const globalStore = globalThis as typeof globalThis & {
   __noaIngestRuntime?: IngestRuntime;
@@ -197,14 +198,17 @@ export function createIngestRuntime(): IngestRuntime {
 }
 
 export function getIngestRuntime(): IngestRuntime {
-  if (
-    !globalStore.__noaIngestRuntime ||
-    globalStore.__noaRuntimeVersion !== RUNTIME_VERSION
-  ) {
+  const existing = globalStore.__noaIngestRuntime;
+  const stale =
+    !existing ||
+    globalStore.__noaRuntimeVersion !== RUNTIME_VERSION ||
+    typeof existing.audit.listRecent !== "function";
+
+  if (stale) {
     globalStore.__noaIngestRuntime = createIngestRuntime();
     globalStore.__noaRuntimeVersion = RUNTIME_VERSION;
   }
-  return globalStore.__noaIngestRuntime;
+  return globalStore.__noaIngestRuntime!;
 }
 
 export function setIngestRuntime(runtime: IngestRuntime | undefined): void {

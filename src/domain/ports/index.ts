@@ -90,6 +90,7 @@ export interface DeliveryAttemptRepository {
 export interface AuditPort {
   record(entry: AuditEntry): Promise<void>;
   listByCorrelationId(correlationId: CorrelationId): Promise<AuditEntry[]>;
+  listRecent(limit: number): Promise<AuditEntry[]>;
 }
 
 export interface DeadLetterRepository {
