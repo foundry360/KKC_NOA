@@ -61,7 +61,7 @@ export type IngestRuntime = {
 } & RuntimeStores;
 
 /** Bump when singleton shape changes so Next.js HMR does not reuse a stale store. */
-const RUNTIME_VERSION = 10;
+const RUNTIME_VERSION = 11;
 
 const globalStore = globalThis as typeof globalThis & {
   __noaIngestRuntime?: IngestRuntime;

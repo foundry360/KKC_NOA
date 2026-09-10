@@ -1,13 +1,19 @@
 import { AppShell } from "@/components/layout/app-shell";
+import { Panel } from "@/components/ui/primitives";
 
 export default function LoginPage() {
   return (
-    <AppShell title="Sign in">
-      <p className="text-black/70 dark:text-white/70">
-        Supabase Auth wiring is scaffolded. Configure{" "}
-        <code className="font-mono text-sm">NEXT_PUBLIC_SUPABASE_*</code> to
-        enable admin sessions. Auth UI arrives with the admin cascade.
-      </p>
+    <AppShell
+      title="Sign in"
+      description="Admin authentication via Supabase Auth."
+    >
+      <Panel>
+        <p className="text-sm text-muted">
+          Auth client scaffolding is in place. Configure{" "}
+          <code className="font-mono text-xs">NEXT_PUBLIC_SUPABASE_*</code> and
+          wire the sign-in form when you harden the admin surface.
+        </p>
+      </Panel>
     </AppShell>
   );
 }

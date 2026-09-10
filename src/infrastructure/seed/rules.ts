@@ -1,12 +1,15 @@
 import type { RuleVersion } from "@/src/domain/rules/rule";
 
-/** Seed rule versions for POC golden path and outpatient exception. */
+/**
+ * Seed rules for facility admissions from any payer.
+ * Outpatient remains explicitly out of scope for NOA.
+ */
 export function createSeedRuleVersions(): RuleVersion[] {
   return [
     {
       id: "11111111-1111-4111-8111-111111111101",
       ruleId: "11111111-1111-4111-8111-111111111001",
-      name: "MEDICARE_INPATIENT_NOA",
+      name: "FACILITY_ADMISSION_NOA",
       version: 1,
       priority: 100,
       effectiveDate: "2020-01-01T00:00:00.000Z",
@@ -14,8 +17,11 @@ export function createSeedRuleVersions(): RuleVersion[] {
       conditions: {
         all: [
           { path: "eventType", op: "eq", value: "ADMISSION" },
-          { path: "encounter.class", op: "eq", value: "INPATIENT" },
-          { path: "payer.payerType", op: "eq", value: "MEDICARE" },
+          {
+            path: "encounter.class",
+            op: "in",
+            value: ["INPATIENT", "EMERGENCY", "OBSERVATION"],
+          },
         ],
       },
       actions: {

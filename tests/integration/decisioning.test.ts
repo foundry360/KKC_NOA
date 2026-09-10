@@ -83,7 +83,7 @@ describe("AdmissionEvent → Decision", () => {
 
     const result = await decisioning.evaluate(sampleAdmission());
     expect(result.decision.decision).toBe("SEND_NOA");
-    expect(result.decision.rulesApplied).toContain("MEDICARE_INPATIENT_NOA");
+    expect(result.decision.rulesApplied).toContain("FACILITY_ADMISSION_NOA");
     expect(result.processingState).toBe("EVALUATED");
 
     const stored = await decisions.findByEventId(result.decisionRecord.eventId);
@@ -128,7 +128,7 @@ describe("Pipeline FHIR → Decision (+ Contract + Transform)", () => {
 
     expect(result.processingState).toBe("ACKNOWLEDGED");
     expect(result.decision?.decision).toBe("SEND_NOA");
-    expect(result.decision?.ruleVersions).toContain("MEDICARE_INPATIENT_NOA@1");
+    expect(result.decision?.ruleVersions).toContain("FACILITY_ADMISSION_NOA@1");
     expect(result.routing?.contractBusinessId).toBe("MEDICARE_NOA_MOCK_V1");
     expect(result.transformation?.payload.patient).toMatchObject({
       lastName: "SYNTHETIC",

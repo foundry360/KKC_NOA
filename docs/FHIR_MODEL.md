@@ -23,11 +23,14 @@ Internal business logic operates on `AdmissionEvent`, not Bundle resource graphs
 | Resource | Role | Required for golden path |
 |----------|------|---------------------------|
 | `MessageHeader` | Event metadata, source, focus | Preferred |
-| `Patient` | Subject | Yes |
-| `Encounter` | Admission encounter | Yes |
+| `Patient` | Subject (MRN + Member Number type=MB when available) | Yes |
+| `Encounter` | Admission encounter (visit id type=VN when available) | Yes |
 | `Coverage` | Payer coverage | Yes (for payer routing) |
 | `Organization` | Facility and/or payer | Yes (facility; payer via Coverage.payor) |
 | `Practitioner` | Providers | Optional but supported |
+| `Condition` | Principal diagnosis | Optional but used on Meridian admits |
+
+Field-level NOA alert inventory (in scope vs deferred vs CRD): [`NOA_ADMISSION_FIELD_MAPPINGS.md`](./NOA_ADMISSION_FIELD_MAPPINGS.md).
 
 ### Out of Scope FHIR Features
 

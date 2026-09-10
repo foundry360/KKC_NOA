@@ -1,51 +1,43 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-
-const NAV = [
-  { href: "/dashboard", label: "Dashboard" },
-  { href: "/events", label: "Events" },
-  { href: "/rules", label: "Rules" },
-  { href: "/contracts", label: "Contracts" },
-  { href: "/transformations", label: "Transformations" },
-  { href: "/destinations", label: "Destinations" },
-  { href: "/deliveries", label: "Deliveries" },
-  { href: "/audit", label: "Audit" },
-] as const;
+import { AppNav } from "@/components/layout/app-nav";
 
 export function AppShell({
   title,
+  description,
   children,
 }: {
   title: string;
+  description?: string;
   children: ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
-      <header className="border-b border-black/10 dark:border-white/10">
-        <div className="mx-auto flex max-w-6xl flex-col gap-3 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-[0.14em] text-black/50 dark:text-white/50">
+    <div className="min-h-screen text-foreground">
+      <header className="border-b border-line bg-surface-raised/90 backdrop-blur-sm">
+        <div className="mx-auto flex max-w-6xl flex-col gap-4 px-6 py-5 sm:flex-row sm:items-end sm:justify-between">
+          <div className="space-y-1">
+            <Link
+              href="/"
+              className="inline-block text-[0.7rem] font-semibold uppercase tracking-[0.22em] text-accent"
+            >
               FHIR NOA Accelerator
-            </p>
-            <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
+            </Link>
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+              {title}
+            </h1>
+            {description ? (
+              <p className="max-w-2xl text-sm text-muted">{description}</p>
+            ) : null}
           </div>
-          <p className="text-sm text-black/60 dark:text-white/60">
-            Integration &amp; orchestration POC
+          <p className="text-xs font-medium uppercase tracking-[0.16em] text-subtle">
+            Integration orchestration
           </p>
         </div>
-        <nav className="mx-auto flex max-w-6xl gap-1 overflow-x-auto px-4 pb-3">
-          {NAV.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="whitespace-nowrap rounded-md px-3 py-1.5 text-sm text-black/70 hover:bg-black/5 hover:text-black dark:text-white/70 dark:hover:bg-white/10 dark:hover:text-white"
-            >
-              {item.label}
-            </Link>
-          ))}
-        </nav>
+        <AppNav />
       </header>
-      <main className="mx-auto max-w-6xl px-6 py-8">{children}</main>
+      <main className="noa-animate-main mx-auto max-w-6xl px-6 py-8">
+        {children}
+      </main>
     </div>
   );
 }

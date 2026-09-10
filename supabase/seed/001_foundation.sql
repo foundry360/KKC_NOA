@@ -1,5 +1,7 @@
 insert into source_systems (code, name, active)
-values ('SYNTHETIC_EHR', 'Synthetic EHR (POC)', true)
+values
+  ('SYNTHETIC_EHR', 'Synthetic EHR (POC)', true),
+  ('MERIDIAN_CLINICAL', 'Meridian Clinical (Mock EHR)', true)
 on conflict (code) do nothing;
 
 -- Seed rules (identity + version). IDs are stable for POC demos.
@@ -7,8 +9,8 @@ insert into rules (id, name, description, priority, active)
 values
   (
     '11111111-1111-4111-8111-111111111001',
-    'MEDICARE_INPATIENT_NOA',
-    'Require NOA for Medicare inpatient admissions',
+    'FACILITY_ADMISSION_NOA',
+    'Require NOA for inpatient, emergency, and observation admissions (any payer)',
     100,
     true
   ),
@@ -28,7 +30,7 @@ values
     '11111111-1111-4111-8111-111111111001',
     1,
     '2020-01-01T00:00:00Z',
-    '{"all":[{"path":"eventType","op":"eq","value":"ADMISSION"},{"path":"encounter.class","op":"eq","value":"INPATIENT"},{"path":"payer.payerType","op":"eq","value":"MEDICARE"}]}'::jsonb,
+    '{"all":[{"path":"eventType","op":"eq","value":"ADMISSION"},{"path":"encounter.class","op":"in","value":["INPATIENT","EMERGENCY","OBSERVATION"]}]}'::jsonb,
     '{"decision":"SEND_NOA","notificationRequired":true,"notificationType":"NOA","priority":"HIGH"}'::jsonb
   ),
   (

@@ -9,17 +9,30 @@ export interface CanonicalHumanName {
 export interface CanonicalPatient {
   id?: string;
   mrn?: string;
+  /** Member number (FHIR Patient.identifier type=MB) */
+  memberId?: string;
   name: CanonicalHumanName;
   birthDate?: string;
   gender?: string;
-  identifiers?: Array<{ system?: string; value: string }>;
+  phone?: string;
+  address?: {
+    line?: string[];
+    city?: string;
+    state?: string;
+    postalCode?: string;
+  };
+  identifiers?: Array<{ system?: string; value: string; type?: string }>;
 }
 
 export interface CanonicalEncounter {
   id?: string;
+  /** Visit / encounter business identifier (FHIR Encounter.identifier type=VN) */
+  visitId?: string;
   status?: string;
   /** Normalized class, e.g. INPATIENT | OUTPATIENT */
   class: string;
+  /** Human-readable unit/room from Encounter.location */
+  locationDisplay?: string;
   period?: {
     start?: ISODateTime;
     end?: ISODateTime;
@@ -61,6 +74,9 @@ export interface CanonicalCoverage {
   status?: string;
   payorRef?: string;
   plan?: string;
+  groupNumber?: string;
+  coverageType?: string;
+  order?: number;
   period?: {
     start?: string;
     end?: string;

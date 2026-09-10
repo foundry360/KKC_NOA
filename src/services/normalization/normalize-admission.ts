@@ -35,14 +35,23 @@ function readName(resource?: FhirResource): CanonicalHumanName {
 
 function readIdentifiers(
   resource?: FhirResource
-): Array<{ system?: string; value: string }> {
+): Array<{ system?: string; value: string; type?: string }> {
   const identifiers = Array.isArray(resource?.identifier) ? resource.identifier : [];
   return identifiers
     .filter(isObject)
-    .map((ident) => ({
-      system: typeof ident.system === "string" ? ident.system : undefined,
-      value: typeof ident.value === "string" ? ident.value : "",
-    }))
+    .map((ident) => {
+      const typeObj = isObject(ident.type) ? ident.type : undefined;
+      const coding =
+        typeObj && Array.isArray(typeObj.coding)
+          ? typeObj.coding.find(isObject)
+          : undefined;
+      return {
+        system: typeof ident.system === "string" ? ident.system : undefined,
+        value: typeof ident.value === "string" ? ident.value : "",
+        type:
+          coding && typeof coding.code === "string" ? coding.code : undefined,
+      };
+    })
     .filter((ident) => ident.value);
 }
 
@@ -52,16 +61,57 @@ function npiFrom(resource?: FhirResource): string | undefined {
   )?.value;
 }
 
+function identifierByType(
+  identifiers: Array<{ system?: string; value: string; type?: string }>,
+  typeCode: string
+): string | undefined {
+  return identifiers.find((i) => i.type === typeCode)?.value;
+}
+
 function mapPatient(patient?: FhirResource): CanonicalPatient {
   const identifiers = readIdentifiers(patient);
-  const mrn = identifiers.find((i) => (i.system ?? "").includes("mrn"))?.value;
+  const mrn =
+    identifiers.find((i) => (i.system ?? "").toLowerCase().includes("mrn"))
+      ?.value ?? identifierByType(identifiers, "MR");
+  const memberId =
+    identifierByType(identifiers, "MB") ??
+    identifiers.find((i) => (i.system ?? "").toLowerCase().includes("member"))
+      ?.value;
+  const telecoms = Array.isArray(patient?.telecom) ? patient.telecom : [];
+  const phoneEntry = telecoms.find(
+    (t) => isObject(t) && t.system === "phone" && typeof t.value === "string"
+  );
+  const addressRaw = Array.isArray(patient?.address)
+    ? patient.address.find(isObject)
+    : undefined;
+
   return {
     id: patient?.id,
     mrn,
+    memberId,
     name: readName(patient),
     birthDate:
       typeof patient?.birthDate === "string" ? patient.birthDate : undefined,
     gender: typeof patient?.gender === "string" ? patient.gender : undefined,
+    phone:
+      phoneEntry && isObject(phoneEntry) && typeof phoneEntry.value === "string"
+        ? phoneEntry.value
+        : undefined,
+    address: addressRaw
+      ? {
+          line: Array.isArray(addressRaw.line)
+            ? addressRaw.line.filter((l): l is string => typeof l === "string")
+            : undefined,
+          city:
+            typeof addressRaw.city === "string" ? addressRaw.city : undefined,
+          state:
+            typeof addressRaw.state === "string" ? addressRaw.state : undefined,
+          postalCode:
+            typeof addressRaw.postalCode === "string"
+              ? addressRaw.postalCode
+              : undefined,
+        }
+      : undefined,
     identifiers,
   };
 }
@@ -134,11 +184,40 @@ function mapPayer(
   };
 }
 
+function coverageClassValue(
+  classes: unknown[],
+  classCode: string
+): { value?: string; name?: string } | undefined {
+  for (const c of classes) {
+    if (!isObject(c)) continue;
+    const typeObj = isObject(c.type) ? c.type : undefined;
+    const coding = Array.isArray(typeObj?.coding) ? typeObj.coding : [];
+    const match = coding.some(
+      (x) => isObject(x) && typeof x.code === "string" && x.code === classCode
+    );
+    if (match) {
+      return {
+        value: typeof c.value === "string" ? c.value : undefined,
+        name: typeof c.name === "string" ? c.name : undefined,
+      };
+    }
+  }
+  return undefined;
+}
+
 function mapCoverage(coverage?: FhirResource): CanonicalCoverage {
   const classes = Array.isArray(coverage?.class) ? coverage.class : [];
-  const planClass = classes.find(isObject);
+  const planClass = coverageClassValue(classes, "plan");
+  const groupClass = coverageClassValue(classes, "group");
+  const fallback = classes.find(isObject);
   const payors = Array.isArray(coverage?.payor) ? coverage.payor : [];
   const firstPayor = payors.find(isObject);
+  const period = isObject(coverage?.period) ? coverage.period : undefined;
+  const typeObj = isObject(coverage?.type) ? coverage.type : undefined;
+  const typeCoding = Array.isArray(typeObj?.coding)
+    ? typeObj.coding.find(isObject)
+    : undefined;
+
   return {
     id: coverage?.id,
     subscriberId:
@@ -151,12 +230,50 @@ function mapCoverage(coverage?: FhirResource): CanonicalCoverage {
         ? firstPayor.reference
         : undefined,
     plan:
-      planClass && typeof planClass.value === "string"
-        ? planClass.value
-        : planClass && typeof planClass.name === "string"
-          ? planClass.name
+      planClass?.value ??
+      planClass?.name ??
+      (fallback && typeof fallback.value === "string"
+        ? fallback.value
+        : fallback && typeof fallback.name === "string"
+          ? fallback.name
+          : undefined),
+    groupNumber: groupClass?.value,
+    coverageType:
+      typeCoding && typeof typeCoding.code === "string"
+        ? typeCoding.code
+        : typeCoding && typeof typeCoding.display === "string"
+          ? typeCoding.display
           : undefined,
+    order: typeof coverage?.order === "number" ? coverage.order : undefined,
+    period: period
+      ? {
+          start: typeof period.start === "string" ? period.start : undefined,
+          end: typeof period.end === "string" ? period.end : undefined,
+        }
+      : undefined,
   };
+}
+
+function mapEncounterLocation(encounter?: FhirResource): string | undefined {
+  const locations = Array.isArray(encounter?.location) ? encounter.location : [];
+  for (const loc of locations) {
+    if (!isObject(loc)) continue;
+    const location = isObject(loc.location) ? loc.location : undefined;
+    if (location && typeof location.display === "string") {
+      return location.display;
+    }
+  }
+  return undefined;
+}
+
+function mapVisitId(encounter?: FhirResource): string | undefined {
+  const identifiers = readIdentifiers(encounter);
+  return (
+    identifierByType(identifiers, "VN") ??
+    identifiers.find((i) => (i.system ?? "").toLowerCase().includes("visit"))
+      ?.value ??
+    encounter?.id
+  );
 }
 
 function mapProviders(
@@ -312,9 +429,11 @@ export class AdmissionNormalizationService implements NormalizationService {
       patient: mapPatient(patient),
       encounter: {
         id: encounter?.id,
+        visitId: mapVisitId(encounter),
         status:
           typeof encounter?.status === "string" ? encounter.status : undefined,
         class: mapEncounterClass(classCode) ?? "UNKNOWN",
+        locationDisplay: mapEncounterLocation(encounter),
         period: {
           start: periodStart,
           end: periodEnd,

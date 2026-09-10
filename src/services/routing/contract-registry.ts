@@ -29,13 +29,18 @@ export class DefaultContractRegistry implements ContractRegistry {
     }
 
     // When multiple contracts match (e.g. Mock/SF/Pega for Medicare),
-    // prefer explicit override, then configured default, then mock adapter.
+    // prefer explicit override, then configured default, then any *MOCK* contract.
     if (!input.contractBusinessId && matches.length > 1) {
       const preferred = matches.find(
         (m) => m.contractBusinessId === this.defaultContractBusinessId
       );
+      const mockPreferred = matches.find((m) =>
+        m.contractBusinessId.includes("_MOCK_")
+      );
       if (preferred) {
         matches = [preferred];
+      } else if (mockPreferred) {
+        matches = [mockPreferred];
       } else {
         matches = [...matches].sort((a, b) => b.version - a.version);
       }

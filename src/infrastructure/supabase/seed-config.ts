@@ -12,6 +12,8 @@ const CONTRACT_PARENT_IDS: Record<string, string> = {
   MEDICARE_NOA_MOCK_V1: "44444444-4444-4444-8444-444444444010",
   MEDICARE_NOA_SF_V1: "44444444-4444-4444-8444-444444444020",
   MEDICARE_NOA_PEGA_V1: "44444444-4444-4444-8444-444444444030",
+  COMMERCIAL_NOA_MOCK_V1: "44444444-4444-4444-8444-444444444040",
+  MEDICAID_NOA_MOCK_V1: "44444444-4444-4444-8444-444444444050",
 };
 
 /** Stable parent UUIDs for transformation header rows. */
@@ -30,11 +32,18 @@ export async function ensureSupabaseConfigSeed(
 ): Promise<void> {
   {
     const { error } = await client.from("source_systems").upsert(
-      {
-        code: "SYNTHETIC_EHR",
-        name: "Synthetic EHR (POC)",
-        active: true,
-      },
+      [
+        {
+          code: "SYNTHETIC_EHR",
+          name: "Synthetic EHR (POC)",
+          active: true,
+        },
+        {
+          code: "MERIDIAN_CLINICAL",
+          name: "Meridian Clinical (Mock EHR)",
+          active: true,
+        },
+      ],
       { onConflict: "code" }
     );
     throwIfError(error, "seed source_systems");

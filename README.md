@@ -52,6 +52,8 @@ Golden path: FHIR → validate → normalize → rules → decide → route → 
 
 Vendor-agnostic: same event → Salesforce or Pega via `X-Contract-Id` only.
 
+**Meridian Clinical (mock EHR):** [`/meridian`](./docs/MERIDIAN_EHR.md) — admit patient → FHIR → this accelerator.
+
 **Persistence:** set `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` to use Supabase repositories (config seed upserted on boot). Without them, the runtime stays in-memory.
 
 ## Security note

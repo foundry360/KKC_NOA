@@ -92,14 +92,29 @@ describe("ContractRegistry", () => {
     expect(result?.destination.code).toBe("PEGA_NOA_CASE");
   });
 
-  it("returns null for unknown payer (NO_CONTRACT)", async () => {
+  it("returns commercial mock contract for commercial payer", async () => {
     const registry = createRegistry();
     const result = await registry.resolve({
       payerType: "COMMERCIAL",
       notificationType: "NOA",
       asOf,
     });
-    expect(result).toBeNull();
+    expect(result?.contractVersion.contractBusinessId).toBe(
+      "COMMERCIAL_NOA_MOCK_V1"
+    );
+    expect(result?.adapterKey).toBe("mock");
+  });
+
+  it("returns medicaid mock contract for medicaid payer", async () => {
+    const registry = createRegistry();
+    const result = await registry.resolve({
+      payerType: "MEDICAID",
+      notificationType: "NOA",
+      asOf,
+    });
+    expect(result?.contractVersion.contractBusinessId).toBe(
+      "MEDICAID_NOA_MOCK_V1"
+    );
   });
 });
 

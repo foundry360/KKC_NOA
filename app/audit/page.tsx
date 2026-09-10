@@ -1,5 +1,9 @@
-import Link from "next/link";
 import { AppShell } from "@/components/layout/app-shell";
+import {
+  EmptyState,
+  StatusBadge,
+  TextLink,
+} from "@/components/ui/primitives";
 import { getIngestRuntime } from "@/src/infrastructure/composition/ingest";
 
 export const dynamic = "force-dynamic";
@@ -9,18 +13,14 @@ export default async function AuditPage() {
   const entries = await audit.listRecent(100);
 
   return (
-    <AppShell title="Audit">
-      <p className="mb-6 text-black/70 dark:text-white/70">
-        Chronological processing history across all events. Start from an event
-        detail page to filter by correlation ID.
-      </p>
-
+    <AppShell
+      title="Audit"
+      description="Chronological processing history. Use Event Detail to filter by correlation ID."
+    >
       {entries.length === 0 ? (
-        <p className="font-mono text-sm text-black/50 dark:text-white/50">
-          No audit records yet.
-        </p>
+        <EmptyState>No audit records yet.</EmptyState>
       ) : (
-        <ol className="space-y-3 text-sm">
+        <ol className="space-y-3">
           {await Promise.all(
             entries.map(async (entry) => {
               const event = entry.eventId
@@ -29,36 +29,40 @@ export default async function AuditPage() {
               return (
                 <li
                   key={entry.id ?? `${entry.action}-${entry.timestamp}`}
-                  className="rounded-lg border border-black/10 p-3 dark:border-white/15"
+                  className="border border-line bg-surface-raised px-4 py-3"
                 >
-                  <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <p className="font-medium">
-                      {entry.action}{" "}
-                      <span className="font-normal text-black/50 dark:text-white/50">
-                        ({entry.status})
-                      </span>
-                    </p>
-                    <p className="font-mono text-xs text-black/50 dark:text-white/50">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-medium">{entry.action}</span>
+                      <StatusBadge
+                        value={entry.status}
+                        tone={
+                          entry.status === "SUCCESS"
+                            ? "success"
+                            : entry.status === "FAILURE"
+                              ? "danger"
+                              : "neutral"
+                        }
+                      />
+                    </div>
+                    <p className="font-mono text-xs text-subtle">
                       {entry.component}
                     </p>
                   </div>
-                  <p className="mt-1 font-mono text-xs text-black/60 dark:text-white/60">
+                  <p className="mt-1 font-mono text-xs text-muted">
                     {entry.timestamp}
                     {entry.correlationId ? ` · ${entry.correlationId}` : ""}
                   </p>
                   {entry.errorMessage ? (
-                    <p className="mt-1 text-black/70 dark:text-white/70">
+                    <p className="mt-2 text-sm text-danger">
                       {entry.errorCode}: {entry.errorMessage}
                     </p>
                   ) : null}
                   {event ? (
-                    <p className="mt-2">
-                      <Link
-                        href={`/events/${event.id}`}
-                        className="underline-offset-2 hover:underline"
-                      >
+                    <p className="mt-3">
+                      <TextLink href={`/events/${event.id}`}>
                         Open event
-                      </Link>
+                      </TextLink>
                     </p>
                   ) : null}
                 </li>

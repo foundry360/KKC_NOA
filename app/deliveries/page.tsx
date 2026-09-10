@@ -1,5 +1,10 @@
-import Link from "next/link";
 import { AppShell } from "@/components/layout/app-shell";
+import {
+  EmptyState,
+  StatusBadge,
+  TextLink,
+  processingTone,
+} from "@/components/ui/primitives";
 import { getIngestRuntime } from "@/src/infrastructure/composition/ingest";
 
 export const dynamic = "force-dynamic";
@@ -9,16 +14,12 @@ export default async function DeliveriesPage() {
   const list = await notifications.listAll();
 
   return (
-    <AppShell title="Deliveries">
-      <p className="mb-6 text-black/70 dark:text-white/70">
-        Outbound notifications, delivery attempts, acknowledgements, and dead
-        letters.
-      </p>
-
+    <AppShell
+      title="Deliveries"
+      description="Outbound notifications, attempts, and acknowledgements."
+    >
       {list.length === 0 ? (
-        <p className="font-mono text-sm text-black/50 dark:text-white/50">
-          No deliveries yet.
-        </p>
+        <EmptyState>No deliveries yet.</EmptyState>
       ) : (
         <div className="space-y-3">
           {await Promise.all(
@@ -28,24 +29,27 @@ export default async function DeliveriesPage() {
               return (
                 <article
                   key={n.id}
-                  className="rounded-lg border border-black/10 p-4 text-sm dark:border-white/15"
+                  className="border border-line bg-surface-raised px-4 py-4"
                 >
-                  <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <p className="font-medium">{n.status}</p>
-                    <p className="font-mono text-xs text-black/50 dark:text-white/50">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <StatusBadge
+                      value={n.status}
+                      tone={processingTone(n.status)}
+                    />
+                    <p className="font-mono text-xs text-subtle">
                       {n.adapterKey} · {tries.length} attempt(s)
                     </p>
                   </div>
-                  <p className="mt-1 font-mono text-xs">
+                  <p className="mt-2 font-mono text-xs text-muted">
                     ack: {ack?.ackId ?? "—"}
                   </p>
-                  <p className="mt-2">
-                    <Link
-                      href={`/events/${n.eventId}`}
-                      className="underline-offset-2 hover:underline"
-                    >
-                      View event
-                    </Link>
+                  <p className="mt-1 font-mono text-xs text-subtle">
+                    {n.correlationId}
+                  </p>
+                  <p className="mt-3">
+                    <TextLink href={`/events/${n.eventId}`}>
+                      Open event
+                    </TextLink>
                   </p>
                 </article>
               );

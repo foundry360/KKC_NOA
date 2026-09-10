@@ -14,14 +14,42 @@ const admission: AdmissionEvent = {
   sourceSystem: "SYNTHETIC_EHR",
   eventType: "ADMISSION",
   eventTimestamp: "2026-09-09T14:30:00.000Z",
-  patient: { name: { family: "SYNTHETIC", given: ["ADA", "LOVELACE"] } },
-  encounter: { class: "INPATIENT" },
+  patient: {
+    mrn: "SYN-MRN-10001",
+    memberId: "SYN-MBI-000111",
+    name: { family: "SYNTHETIC", given: ["ADA", "LOVELACE"] },
+    birthDate: "1970-01-15",
+    gender: "female",
+    phone: "555-0100",
+    address: {
+      line: ["42 Example St"],
+      city: "Exampleville",
+      state: "MA",
+      postalCode: "02108",
+    },
+  },
+  encounter: {
+    class: "INPATIENT",
+    visitId: "VISIT-001",
+    status: "in-progress",
+    locationDisplay: "4 South / Room 402",
+  },
   admission: { admissionDateTime: "2026-09-09T14:30:00Z" },
-  facility: { name: "Synthetic General Hospital" },
-  payer: { payerType: "MEDICARE" },
-  coverage: {},
+  facility: { name: "Synthetic General Hospital", npi: "1999999998" },
+  payer: { payerType: "MEDICARE", name: "Synthetic Medicare" },
+  coverage: {
+    subscriberId: "SYN-MBI-000111",
+    status: "active",
+    plan: "SYNTHETIC-MEDICARE-A",
+  },
   diagnoses: [],
-  providers: [],
+  providers: [
+    {
+      npi: "1999999999",
+      name: { family: "SYNTHETIC", given: ["GRACE"] },
+      role: "attender",
+    },
+  ],
   sourceMetadata: {},
 };
 
@@ -49,12 +77,76 @@ describe("path-set + mapping engine", () => {
 
     expect(result.payload).toMatchObject({
       notificationType: "NOA",
-      patient: { lastName: "SYNTHETIC", firstName: "ADA" },
+      patient: {
+        lastName: "SYNTHETIC",
+        firstName: "ADA",
+        memberId: "SYN-MBI-000111",
+        mrn: "SYN-MRN-10001",
+      },
       encounterClass: "INPATIENT",
       payerType: "MEDICARE",
       correlationId: "NOA-20260909-000030",
+      attendingProviderNpi: "1999999999",
+      facilityNpi: "1999999998",
     });
-    expect(result.mappingTrace.every((t) => t.status !== "MISSING")).toBe(true);
+    expect(
+      result.mappingTrace
+        .filter((t) =>
+          definition.mappings.find(
+            (m) => m.sourcePath === t.sourcePath && m.targetPath === t.targetPath
+          )?.required
+        )
+        .every((t) => t.status !== "MISSING")
+    ).toBe(true);
+  });
+
+  it("maps expanded NOA fields onto Pega spreadsheet property names", async () => {
+    const engine = new SimpleMappingTransformationEngine();
+    const definition = createSeedTransformations().find(
+      (t) => t.code === "MEDICARE_NOA_PEGA_TRANSFORM"
+    )!;
+
+    const result = await engine.transform(admission, definition, {
+      decision: "SEND_NOA",
+      notificationRequired: true,
+      notificationType: "NOA",
+      priority: "HIGH",
+      rulesApplied: [],
+      ruleVersions: [],
+    });
+
+    expect(result.payload).toMatchObject({
+      MemberID: "SYN-MBI-000111",
+      VisitID: "VISIT-001",
+      ProviderNPI: "1999999999",
+      EncounterLocationName: "4 South / Room 402",
+      FacilityNPI: "1999999998",
+      DateOfBirth: "1970-01-15",
+      CheckInDateTime: "2026-09-09T14:30:00Z",
+    });
+  });
+
+  it("maps expanded NOA fields onto Salesforce field names", async () => {
+    const engine = new SimpleMappingTransformationEngine();
+    const definition = createSeedTransformations().find(
+      (t) => t.code === "MEDICARE_NOA_SF_TRANSFORM"
+    )!;
+
+    const result = await engine.transform(admission, definition, {
+      decision: "SEND_NOA",
+      notificationRequired: true,
+      notificationType: "NOA",
+      priority: "HIGH",
+      rulesApplied: [],
+      ruleVersions: [],
+    });
+
+    expect(result.payload).toMatchObject({
+      MemberId__c: "SYN-MBI-000111",
+      VisitId__c: "VISIT-001",
+      ProviderNPI__c: "1999999999",
+      LocationName__c: "4 South / Room 402",
+    });
   });
 
   it("fails when required fields are missing", async () => {

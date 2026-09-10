@@ -1,5 +1,10 @@
-import Link from "next/link";
 import { AppShell } from "@/components/layout/app-shell";
+import {
+  EmptyState,
+  StatusBadge,
+  TextLink,
+  processingTone,
+} from "@/components/ui/primitives";
 import { getIngestRuntime } from "@/src/infrastructure/composition/ingest";
 
 export const dynamic = "force-dynamic";
@@ -9,28 +14,25 @@ export default async function EventsPage() {
   const recent = await events.listRecent(25);
 
   return (
-    <AppShell title="Events">
-      <p className="mb-6 text-black/70 dark:text-white/70">
-        Inbound FHIR events. Uses Supabase when{" "}
-        <code className="font-mono text-xs">SUPABASE_SERVICE_ROLE_KEY</code> is
-        set; otherwise process-local memory.
-      </p>
-
+    <AppShell
+      title="Events"
+      description="Inbound FHIR admissions and their processing outcomes."
+    >
       {recent.length === 0 ? (
-        <p className="font-mono text-sm text-black/50 dark:text-white/50">
+        <EmptyState>
           No events yet. POST a Bundle to /api/fhir/r4/events
-        </p>
+        </EmptyState>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px] border-collapse text-left text-sm">
+        <div className="overflow-x-auto border border-line bg-surface-raised">
+          <table className="w-full min-w-[720px] border-collapse text-left text-sm">
             <thead>
-              <tr className="border-b border-black/10 text-xs uppercase tracking-wide text-black/50 dark:border-white/15 dark:text-white/50">
-                <th className="py-2 pr-3 font-medium">Correlation</th>
-                <th className="py-2 pr-3 font-medium">State</th>
-                <th className="py-2 pr-3 font-medium">Decision</th>
-                <th className="py-2 pr-3 font-medium">Class / Payer</th>
-                <th className="py-2 pr-3 font-medium">Received</th>
-                <th className="py-2 font-medium">Detail</th>
+              <tr className="border-b border-line bg-surface text-[0.7rem] uppercase tracking-[0.12em] text-subtle">
+                <th className="px-4 py-3 font-semibold">Correlation</th>
+                <th className="px-4 py-3 font-semibold">State</th>
+                <th className="px-4 py-3 font-semibold">Decision</th>
+                <th className="px-4 py-3 font-semibold">Class / Payer</th>
+                <th className="px-4 py-3 font-semibold">Received</th>
+                <th className="px-4 py-3 font-semibold" />
               </tr>
             </thead>
             <tbody>
@@ -41,28 +43,30 @@ export default async function EventsPage() {
                   return (
                     <tr
                       key={event.id}
-                      className="border-b border-black/5 dark:border-white/10"
+                      className="border-b border-line last:border-b-0"
                     >
-                      <td className="py-3 pr-3 font-mono text-xs">
+                      <td className="px-4 py-3 font-mono text-xs">
                         {event.correlationId}
                       </td>
-                      <td className="py-3 pr-3">{event.processingState}</td>
-                      <td className="py-3 pr-3">{decision?.decision ?? "—"}</td>
-                      <td className="py-3 pr-3 text-black/70 dark:text-white/70">
+                      <td className="px-4 py-3">
+                        <StatusBadge
+                          value={event.processingState}
+                          tone={processingTone(event.processingState)}
+                        />
+                      </td>
+                      <td className="px-4 py-3 text-muted">
+                        {decision?.decision ?? "—"}
+                      </td>
+                      <td className="px-4 py-3 text-muted">
                         {admission
                           ? `${admission.encounter.class} / ${admission.payer.payerType ?? "—"}`
                           : "—"}
                       </td>
-                      <td className="py-3 pr-3 font-mono text-xs text-black/60 dark:text-white/60">
+                      <td className="px-4 py-3 font-mono text-xs text-subtle">
                         {event.receivedAt}
                       </td>
-                      <td className="py-3">
-                        <Link
-                          href={`/events/${event.id}`}
-                          className="text-sm underline-offset-2 hover:underline"
-                        >
-                          View
-                        </Link>
+                      <td className="px-4 py-3 text-right">
+                        <TextLink href={`/events/${event.id}`}>View</TextLink>
                       </td>
                     </tr>
                   );

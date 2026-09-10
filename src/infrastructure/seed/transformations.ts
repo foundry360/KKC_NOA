@@ -1,5 +1,52 @@
 import type { TransformationDefinition } from "@/src/domain/transformations/transformation";
 
+/** Shared optional NOA admission-alert fields (spreadsheet “pass in alert” subset). */
+const SHARED_OPTIONAL_IDENTITY: TransformationDefinition["mappings"] = [
+  { sourcePath: "patient.memberId", targetPath: "patient.memberId", required: false },
+  { sourcePath: "patient.mrn", targetPath: "patient.mrn", required: false },
+  { sourcePath: "patient.birthDate", targetPath: "patient.birthDate", required: false },
+  { sourcePath: "patient.gender", targetPath: "patient.gender", required: false },
+  { sourcePath: "patient.phone", targetPath: "patient.phone", required: false },
+  {
+    sourcePath: "patient.address.line",
+    targetPath: "patient.address.line1",
+    required: false,
+    transform: "first",
+  },
+  { sourcePath: "patient.address.city", targetPath: "patient.address.city", required: false },
+  { sourcePath: "patient.address.state", targetPath: "patient.address.state", required: false },
+  {
+    sourcePath: "patient.address.postalCode",
+    targetPath: "patient.address.postalCode",
+    required: false,
+  },
+  { sourcePath: "encounter.visitId", targetPath: "encounter.visitId", required: false },
+  { sourcePath: "encounter.status", targetPath: "encounter.status", required: false },
+  {
+    sourcePath: "encounter.locationDisplay",
+    targetPath: "encounter.locationDisplay",
+    required: false,
+  },
+  { sourcePath: "facility.npi", targetPath: "facilityNpi", required: false },
+  { sourcePath: "payer.name", targetPath: "payerName", required: false },
+  { sourcePath: "coverage.subscriberId", targetPath: "coverage.subscriberId", required: false },
+  { sourcePath: "coverage.status", targetPath: "coverage.status", required: false },
+  { sourcePath: "coverage.plan", targetPath: "coverage.plan", required: false },
+  { sourcePath: "coverage.groupNumber", targetPath: "coverage.groupNumber", required: false },
+  { sourcePath: "providers.0.npi", targetPath: "attendingProviderNpi", required: false },
+  {
+    sourcePath: "providers.0.name.family",
+    targetPath: "attendingProviderLastName",
+    required: false,
+  },
+  {
+    sourcePath: "providers.0.name.given",
+    targetPath: "attendingProviderFirstName",
+    required: false,
+    transform: "first",
+  },
+];
+
 const MOCK_MAPPINGS: TransformationDefinition["mappings"] = [
   { sourcePath: "notificationType", targetPath: "notificationType", required: true },
   {
@@ -23,6 +70,7 @@ const MOCK_MAPPINGS: TransformationDefinition["mappings"] = [
   { sourcePath: "payer.payerType", targetPath: "payerType", required: true },
   { sourcePath: "facility.name", targetPath: "facilityName", required: false },
   { sourcePath: "correlationId", targetPath: "correlationId", required: true },
+  ...SHARED_OPTIONAL_IDENTITY,
 ];
 
 const SF_MAPPINGS: TransformationDefinition["mappings"] = [
@@ -46,14 +94,58 @@ const SF_MAPPINGS: TransformationDefinition["mappings"] = [
   { sourcePath: "encounter.class", targetPath: "EncounterClass__c", required: true },
   { sourcePath: "payer.payerType", targetPath: "PayerType__c", required: true },
   { sourcePath: "correlationId", targetPath: "correlationId", required: true },
+  { sourcePath: "patient.memberId", targetPath: "MemberId__c", required: false },
+  { sourcePath: "patient.mrn", targetPath: "MRN__c", required: false },
+  { sourcePath: "patient.birthDate", targetPath: "DateOfBirth__c", required: false },
+  { sourcePath: "patient.gender", targetPath: "Gender__c", required: false },
+  { sourcePath: "patient.phone", targetPath: "Phone__c", required: false },
+  {
+    sourcePath: "patient.address.line",
+    targetPath: "AddressLine1__c",
+    required: false,
+    transform: "first",
+  },
+  { sourcePath: "patient.address.city", targetPath: "City__c", required: false },
+  { sourcePath: "patient.address.state", targetPath: "State__c", required: false },
+  { sourcePath: "patient.address.postalCode", targetPath: "PostalCode__c", required: false },
+  { sourcePath: "encounter.visitId", targetPath: "VisitId__c", required: false },
+  { sourcePath: "encounter.status", targetPath: "EncounterStatus__c", required: false },
+  {
+    sourcePath: "encounter.locationDisplay",
+    targetPath: "LocationName__c",
+    required: false,
+  },
+  { sourcePath: "facility.name", targetPath: "FacilityName__c", required: false },
+  { sourcePath: "facility.npi", targetPath: "FacilityNPI__c", required: false },
+  { sourcePath: "payer.name", targetPath: "PayerName__c", required: false },
+  { sourcePath: "coverage.subscriberId", targetPath: "SubscriberId__c", required: false },
+  { sourcePath: "coverage.plan", targetPath: "Plan__c", required: false },
+  { sourcePath: "providers.0.npi", targetPath: "ProviderNPI__c", required: false },
+  {
+    sourcePath: "providers.0.name.family",
+    targetPath: "ProviderLastName__c",
+    required: false,
+  },
+  {
+    sourcePath: "providers.0.name.given",
+    targetPath: "ProviderFirstName__c",
+    required: false,
+    transform: "first",
+  },
 ];
 
+/** Pega property names aligned to the NOA alert spreadsheet (illustrative). */
 const PEGA_MAPPINGS: TransformationDefinition["mappings"] = [
   { sourcePath: "notificationType", targetPath: "notificationType", required: true },
   {
     sourcePath: "admission.admissionDateTime",
     targetPath: "AdmissionDateTime",
     required: true,
+  },
+  {
+    sourcePath: "admission.admissionDateTime",
+    targetPath: "CheckInDateTime",
+    required: false,
   },
   {
     sourcePath: "patient.name.family",
@@ -69,9 +161,49 @@ const PEGA_MAPPINGS: TransformationDefinition["mappings"] = [
   { sourcePath: "encounter.class", targetPath: "EncounterClass", required: true },
   { sourcePath: "payer.payerType", targetPath: "PayerType", required: true },
   { sourcePath: "correlationId", targetPath: "correlationId", required: true },
+  { sourcePath: "patient.memberId", targetPath: "MemberID", required: false },
+  { sourcePath: "patient.mrn", targetPath: "MRN", required: false },
+  { sourcePath: "patient.birthDate", targetPath: "DateOfBirth", required: false },
+  { sourcePath: "patient.gender", targetPath: "Gender", required: false },
+  { sourcePath: "patient.phone", targetPath: "PhoneNumber", required: false },
+  {
+    sourcePath: "patient.address.line",
+    targetPath: "AddressLine1",
+    required: false,
+    transform: "first",
+  },
+  { sourcePath: "patient.address.city", targetPath: "City", required: false },
+  { sourcePath: "patient.address.state", targetPath: "State", required: false },
+  { sourcePath: "patient.address.postalCode", targetPath: "PostalCode", required: false },
+  { sourcePath: "encounter.visitId", targetPath: "VisitID", required: false },
+  { sourcePath: "encounter.status", targetPath: "EncounterStatus", required: false },
+  {
+    sourcePath: "encounter.locationDisplay",
+    targetPath: "EncounterLocationName",
+    required: false,
+  },
+  { sourcePath: "facility.name", targetPath: "FacilityName", required: false },
+  { sourcePath: "facility.npi", targetPath: "FacilityNPI", required: false },
+  { sourcePath: "payer.name", targetPath: "PayerName", required: false },
+  { sourcePath: "coverage.subscriberId", targetPath: "SubscriberID", required: false },
+  { sourcePath: "coverage.status", targetPath: "CoverageStatus", required: false },
+  { sourcePath: "coverage.plan", targetPath: "Plan", required: false },
+  { sourcePath: "coverage.groupNumber", targetPath: "GroupNumber", required: false },
+  { sourcePath: "providers.0.npi", targetPath: "ProviderNPI", required: false },
+  {
+    sourcePath: "providers.0.name.family",
+    targetPath: "ProviderLastName",
+    required: false,
+  },
+  {
+    sourcePath: "providers.0.name.given",
+    targetPath: "ProviderFirstName",
+    required: false,
+    transform: "first",
+  },
 ];
 
-/** Full mapping definitions for Step 7. */
+/** Full mapping definitions for Step 7 + NOA admission-alert field expansion. */
 export function createSeedTransformations(): TransformationDefinition[] {
   return [
     {

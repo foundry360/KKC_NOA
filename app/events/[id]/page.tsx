@@ -1,6 +1,14 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
+import {
+  CodeBlock,
+  DefList,
+  Panel,
+  Section,
+  StatusBadge,
+  TextLink,
+  processingTone,
+} from "@/components/ui/primitives";
 import { getIngestRuntime } from "@/src/infrastructure/composition/ingest";
 
 export const dynamic = "force-dynamic";
@@ -37,170 +45,151 @@ export default async function EventDetailPage({
   const trail = await audit.listByCorrelationId(event.correlationId);
 
   return (
-    <AppShell title="Event Detail">
-      <p className="mb-6">
-        <Link href="/events" className="text-sm underline-offset-2 hover:underline">
-          ← Events
-        </Link>
+    <AppShell
+      title="Event Detail"
+      description="End-to-end journey for one admission event."
+    >
+      <p className="mb-8">
+        <TextLink href="/events">← Events</TextLink>
       </p>
 
-      <section className="mb-8 space-y-2">
-        <h2 className="text-lg font-semibold">Event</h2>
-        <dl className="grid gap-2 text-sm sm:grid-cols-2">
-          <div>
-            <dt className="text-black/50 dark:text-white/50">Event ID</dt>
-            <dd className="font-mono text-xs">{event.id}</dd>
+      <Section title="Event">
+        <Panel>
+          <div className="mb-4">
+            <StatusBadge
+              value={event.processingState}
+              tone={processingTone(event.processingState)}
+            />
           </div>
-          <div>
-            <dt className="text-black/50 dark:text-white/50">Correlation ID</dt>
-            <dd className="font-mono text-xs">{event.correlationId}</dd>
-          </div>
-          <div>
-            <dt className="text-black/50 dark:text-white/50">Source</dt>
-            <dd>{event.sourceSystemCode ?? "—"}</dd>
-          </div>
-          <div>
-            <dt className="text-black/50 dark:text-white/50">Processing state</dt>
-            <dd>{event.processingState}</dd>
-          </div>
-          <div>
-            <dt className="text-black/50 dark:text-white/50">Received</dt>
-            <dd className="font-mono text-xs">{event.receivedAt}</dd>
-          </div>
-          <div>
-            <dt className="text-black/50 dark:text-white/50">Content type</dt>
-            <dd>{event.contentType}</dd>
-          </div>
-        </dl>
-      </section>
+          <DefList
+            items={[
+              { label: "Event ID", value: event.id, mono: true },
+              {
+                label: "Correlation ID",
+                value: event.correlationId,
+                mono: true,
+              },
+              { label: "Source", value: event.sourceSystemCode ?? "—" },
+              { label: "Received", value: event.receivedAt, mono: true },
+              { label: "Content type", value: event.contentType, wide: true },
+            ]}
+          />
+        </Panel>
+      </Section>
 
-      {admission ? (
-        <section className="mb-8 space-y-2">
-          <h2 className="text-lg font-semibold">Canonical AdmissionEvent</h2>
-          <dl className="grid gap-2 text-sm sm:grid-cols-2">
-            <div>
-              <dt className="text-black/50 dark:text-white/50">Patient</dt>
-              <dd>
-                {admission.patient.name.given?.join(" ")}{" "}
-                {admission.patient.name.family}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-black/50 dark:text-white/50">Encounter class</dt>
-              <dd>{admission.encounter.class}</dd>
-            </div>
-            <div>
-              <dt className="text-black/50 dark:text-white/50">Admission</dt>
-              <dd className="font-mono text-xs">
-                {admission.admission.admissionDateTime}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-black/50 dark:text-white/50">Facility</dt>
-              <dd>{admission.facility.name}</dd>
-            </div>
-            <div>
-              <dt className="text-black/50 dark:text-white/50">Payer</dt>
-              <dd>
-                {admission.payer.name} ({admission.payer.payerType})
-              </dd>
-            </div>
-            <div>
-              <dt className="text-black/50 dark:text-white/50">Coverage</dt>
-              <dd>{admission.coverage.plan ?? admission.coverage.status}</dd>
-            </div>
-          </dl>
-          <pre className="mt-4 overflow-x-auto rounded-md bg-black/[0.04] p-3 font-mono text-xs dark:bg-white/[0.06]">
-            {JSON.stringify(admission, null, 2)}
-          </pre>
-        </section>
-      ) : (
-        <section className="mb-8">
-          <h2 className="text-lg font-semibold">Canonical AdmissionEvent</h2>
-          <p className="text-sm text-black/60 dark:text-white/60">
+      <Section title="Canonical AdmissionEvent">
+        {admission ? (
+          <div className="space-y-4">
+            <Panel>
+              <DefList
+                items={[
+                  {
+                    label: "Patient",
+                    value: `${admission.patient.name.given?.join(" ") ?? ""} ${admission.patient.name.family ?? ""}`.trim(),
+                  },
+                  {
+                    label: "Encounter class",
+                    value: admission.encounter.class,
+                  },
+                  {
+                    label: "Admission",
+                    value: admission.admission.admissionDateTime ?? "—",
+                    mono: true,
+                  },
+                  { label: "Facility", value: admission.facility.name ?? "—" },
+                  {
+                    label: "Payer",
+                    value: `${admission.payer.name ?? "—"} (${admission.payer.payerType ?? "—"})`,
+                  },
+                  {
+                    label: "Coverage",
+                    value:
+                      admission.coverage.plan ??
+                      admission.coverage.status ??
+                      "—",
+                  },
+                ]}
+              />
+            </Panel>
+            <CodeBlock>{JSON.stringify(admission, null, 2)}</CodeBlock>
+          </div>
+        ) : (
+          <p className="text-sm text-muted">
             Not available ({event.processingState}
             {event.errorSummary ? ` — ${event.errorSummary}` : ""})
           </p>
-        </section>
-      )}
+        )}
+      </Section>
 
-      <section className="mb-8 space-y-2">
-        <h2 className="text-lg font-semibold">Decision</h2>
+      <Section title="Decision">
         {decision ? (
-          <dl className="grid gap-2 text-sm sm:grid-cols-2">
-            <div>
-              <dt className="text-black/50 dark:text-white/50">Decision</dt>
-              <dd className="font-medium">{decision.decision}</dd>
-            </div>
-            <div>
-              <dt className="text-black/50 dark:text-white/50">NOA required</dt>
-              <dd>{decision.notificationRequired ? "Yes" : "No"}</dd>
-            </div>
-            <div>
-              <dt className="text-black/50 dark:text-white/50">Type / Priority</dt>
-              <dd>
-                {decision.notificationType ?? "—"} / {decision.priority ?? "—"}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-black/50 dark:text-white/50">Rules applied</dt>
-              <dd className="font-mono text-xs">
-                {decision.rulesApplied.length
-                  ? decision.rulesApplied.join(", ")
-                  : "—"}
-              </dd>
-            </div>
-            <div className="sm:col-span-2">
-              <dt className="text-black/50 dark:text-white/50">Rule versions</dt>
-              <dd className="font-mono text-xs">
-                {decision.ruleVersions.length
-                  ? decision.ruleVersions.join(", ")
-                  : "—"}
-              </dd>
-            </div>
+          <Panel>
+            <DefList
+              items={[
+                { label: "Decision", value: decision.decision },
+                {
+                  label: "NOA required",
+                  value: decision.notificationRequired ? "Yes" : "No",
+                },
+                {
+                  label: "Type / Priority",
+                  value: `${decision.notificationType ?? "—"} / ${decision.priority ?? "—"}`,
+                },
+                {
+                  label: "Rules applied",
+                  value: decision.rulesApplied.length
+                    ? decision.rulesApplied.join(", ")
+                    : "—",
+                  mono: true,
+                },
+                {
+                  label: "Rule versions",
+                  value: decision.ruleVersions.length
+                    ? decision.ruleVersions.join(", ")
+                    : "—",
+                  mono: true,
+                  wide: true,
+                },
+              ]}
+            />
             {execution ? (
-              <div className="sm:col-span-2">
-                <dt className="text-black/50 dark:text-white/50">
+              <div className="mt-4">
+                <p className="mb-2 text-xs uppercase tracking-[0.1em] text-subtle">
                   Execution input snapshot
-                </dt>
-                <dd>
-                  <pre className="mt-1 overflow-x-auto rounded-md bg-black/[0.04] p-3 font-mono text-xs dark:bg-white/[0.06]">
-                    {JSON.stringify(execution.inputSnapshot, null, 2)}
-                  </pre>
-                </dd>
+                </p>
+                <CodeBlock>
+                  {JSON.stringify(execution.inputSnapshot, null, 2)}
+                </CodeBlock>
               </div>
             ) : null}
-          </dl>
+          </Panel>
         ) : (
-          <p className="text-sm text-black/60 dark:text-white/60">
-            No decision recorded for this event.
-          </p>
+          <p className="text-sm text-muted">No decision recorded for this event.</p>
         )}
-      </section>
+      </Section>
 
-      <section className="mb-8 space-y-2">
-        <h2 className="text-lg font-semibold">Contract / Routing</h2>
+      <Section title="Contract / Routing">
         {selection ? (
-          <dl className="grid gap-2 text-sm sm:grid-cols-2">
-            <div>
-              <dt className="text-black/50 dark:text-white/50">Contract</dt>
-              <dd className="font-mono text-xs">{selection.contractBusinessId}</dd>
-            </div>
-            <div>
-              <dt className="text-black/50 dark:text-white/50">Destination</dt>
-              <dd>{selection.destinationCode}</dd>
-            </div>
-            <div>
-              <dt className="text-black/50 dark:text-white/50">Adapter</dt>
-              <dd>{selection.adapterKey}</dd>
-            </div>
-            <div>
-              <dt className="text-black/50 dark:text-white/50">Transformer</dt>
-              <dd className="font-mono text-xs">{selection.transformerCode}</dd>
-            </div>
-          </dl>
+          <Panel>
+            <DefList
+              items={[
+                {
+                  label: "Contract",
+                  value: selection.contractBusinessId,
+                  mono: true,
+                },
+                { label: "Destination", value: selection.destinationCode },
+                { label: "Adapter", value: selection.adapterKey },
+                {
+                  label: "Transformer",
+                  value: selection.transformerCode,
+                  mono: true,
+                },
+              ]}
+            />
+          </Panel>
         ) : (
-          <p className="text-sm text-black/60 dark:text-white/60">
+          <p className="text-sm text-muted">
             No contract selected
             {event.processingState === "NO_CONTRACT"
               ? " (NO_CONTRACT)"
@@ -211,34 +200,31 @@ export default async function EventDetailPage({
             .
           </p>
         )}
-      </section>
+      </Section>
 
-      <section className="mb-8 space-y-2">
-        <h2 className="text-lg font-semibold">Transformation</h2>
+      <Section title="Transformation">
         {transform ? (
-          <div className="space-y-3 text-sm">
-            <p className="font-mono text-xs text-black/60 dark:text-white/60">
+          <div className="space-y-3">
+            <p className="font-mono text-xs text-muted">
               {transform.transformerCode}@v{transform.transformerVersion}
             </p>
             <div>
-              <p className="mb-1 text-black/50 dark:text-white/50">
+              <p className="mb-2 text-xs uppercase tracking-[0.1em] text-subtle">
                 Destination payload
               </p>
-              <pre className="overflow-x-auto rounded-md bg-black/[0.04] p-3 font-mono text-xs dark:bg-white/[0.06]">
-                {JSON.stringify(transform.payload, null, 2)}
-              </pre>
+              <CodeBlock>{JSON.stringify(transform.payload, null, 2)}</CodeBlock>
             </div>
             <div>
-              <p className="mb-1 text-black/50 dark:text-white/50">
+              <p className="mb-2 text-xs uppercase tracking-[0.1em] text-subtle">
                 Mapping trace
               </p>
-              <pre className="overflow-x-auto rounded-md bg-black/[0.04] p-3 font-mono text-xs dark:bg-white/[0.06]">
+              <CodeBlock>
                 {JSON.stringify(transform.mappingTrace, null, 2)}
-              </pre>
+              </CodeBlock>
             </div>
           </div>
         ) : (
-          <p className="text-sm text-black/60 dark:text-white/60">
+          <p className="text-sm text-muted">
             No destination payload
             {event.processingState === "TRANSFORM_FAILED"
               ? " (TRANSFORM_FAILED)"
@@ -246,65 +232,66 @@ export default async function EventDetailPage({
             .
           </p>
         )}
-      </section>
+      </Section>
 
-      <section className="mb-8 space-y-2">
-        <h2 className="text-lg font-semibold">Delivery</h2>
+      <Section title="Delivery">
         {notification ? (
-          <div className="space-y-3 text-sm">
-            <dl className="grid gap-2 sm:grid-cols-2">
-              <div>
-                <dt className="text-black/50 dark:text-white/50">Status</dt>
-                <dd>{notification.status}</dd>
-              </div>
-              <div>
-                <dt className="text-black/50 dark:text-white/50">Adapter</dt>
-                <dd>{notification.adapterKey}</dd>
-              </div>
-              <div>
-                <dt className="text-black/50 dark:text-white/50">Attempts</dt>
-                <dd>{deliveryAttempts.length}</dd>
-              </div>
-              <div>
-                <dt className="text-black/50 dark:text-white/50">Ack ID</dt>
-                <dd className="font-mono text-xs">
-                  {deliveryAttempts.find((a) => a.acknowledgement)?.acknowledgement
-                    ?.ackId ?? "—"}
-                </dd>
-              </div>
-            </dl>
-            <pre className="overflow-x-auto rounded-md bg-black/[0.04] p-3 font-mono text-xs dark:bg-white/[0.06]">
+          <div className="space-y-3">
+            <Panel>
+              <DefList
+                items={[
+                  { label: "Status", value: notification.status },
+                  { label: "Adapter", value: notification.adapterKey },
+                  {
+                    label: "Attempts",
+                    value: String(deliveryAttempts.length),
+                  },
+                  {
+                    label: "Ack ID",
+                    value:
+                      deliveryAttempts.find((a) => a.acknowledgement)
+                        ?.acknowledgement?.ackId ?? "—",
+                    mono: true,
+                  },
+                ]}
+              />
+            </Panel>
+            <CodeBlock>
               {JSON.stringify(deliveryAttempts, null, 2)}
-            </pre>
+            </CodeBlock>
           </div>
         ) : (
-          <p className="text-sm text-black/60 dark:text-white/60">
-            No delivery recorded.
-          </p>
+          <p className="text-sm text-muted">No delivery recorded.</p>
         )}
-      </section>
+      </Section>
 
-      <section className="mb-8 space-y-2">
-        <h2 className="text-lg font-semibold">Audit</h2>
-        <ol className="space-y-2 text-sm">
+      <Section title="Audit">
+        <ol className="space-y-3">
           {trail.map((entry) => (
             <li
               key={entry.id ?? `${entry.action}-${entry.timestamp}`}
-              className="flex flex-col gap-0.5 border-l-2 border-black/15 pl-3 dark:border-white/20"
+              className="border-l-2 border-accent/40 pl-3"
             >
-              <span className="font-medium">
-                {entry.action}{" "}
-                <span className="font-normal text-black/50 dark:text-white/50">
-                  ({entry.status})
-                </span>
-              </span>
-              <span className="font-mono text-xs text-black/50 dark:text-white/50">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm font-medium">{entry.action}</span>
+                <StatusBadge
+                  value={entry.status}
+                  tone={
+                    entry.status === "SUCCESS"
+                      ? "success"
+                      : entry.status === "FAILURE"
+                        ? "danger"
+                        : "neutral"
+                  }
+                />
+              </div>
+              <p className="mt-1 font-mono text-xs text-subtle">
                 {entry.timestamp} · {entry.component}
-              </span>
+              </p>
             </li>
           ))}
         </ol>
-      </section>
+      </Section>
     </AppShell>
   );
 }

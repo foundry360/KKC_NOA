@@ -59,6 +59,22 @@ values
     'MEDICARE',
     'NOA',
     true
+  ),
+  (
+    '44444444-4444-4444-8444-444444444040',
+    'COMMERCIAL_NOA_MOCK_V1',
+    'Commercial NOA → Mock Payer',
+    'COMMERCIAL',
+    'NOA',
+    true
+  ),
+  (
+    '44444444-4444-4444-8444-444444444050',
+    'MEDICAID_NOA_MOCK_V1',
+    'Medicaid NOA → Mock Payer',
+    'MEDICAID',
+    'NOA',
+    true
   )
 on conflict (id) do nothing;
 
@@ -105,6 +121,32 @@ values
     'HTTP_200_BODY',
     '{"maxAttempts":3,"backoffMs":[1000,5000,15000],"deadLetterAfterMax":true}'::jsonb,
     '["notificationType","AdmissionDateTime","MemberLastName","correlationId"]'::jsonb
+  ),
+  (
+    '44444444-4444-4444-8444-444444444004',
+    '44444444-4444-4444-8444-444444444040',
+    1,
+    '2020-01-01T00:00:00Z',
+    'JSON',
+    'REST',
+    '22222222-2222-4222-8222-222222222001',
+    'MEDICARE_NOA_MOCK_TRANSFORM',
+    'HTTP_200_BODY',
+    '{"maxAttempts":3,"backoffMs":[1000,5000,15000],"deadLetterAfterMax":true}'::jsonb,
+    '["notificationType","admissionDateTime","patient.lastName","correlationId"]'::jsonb
+  ),
+  (
+    '44444444-4444-4444-8444-444444444005',
+    '44444444-4444-4444-8444-444444444050',
+    1,
+    '2020-01-01T00:00:00Z',
+    'JSON',
+    'REST',
+    '22222222-2222-4222-8222-222222222001',
+    'MEDICARE_NOA_MOCK_TRANSFORM',
+    'HTTP_200_BODY',
+    '{"maxAttempts":3,"backoffMs":[1000,5000,15000],"deadLetterAfterMax":true}'::jsonb,
+    '["notificationType","admissionDateTime","patient.lastName","correlationId"]'::jsonb
   )
 on conflict (id) do nothing;
 
@@ -140,7 +182,7 @@ values
     1,
     'AdmissionEvent',
     'JSON',
-    '[{"sourcePath":"notificationType","targetPath":"notificationType","required":true},{"sourcePath":"admission.admissionDateTime","targetPath":"admissionDateTime","required":true,"transform":"dateIso"},{"sourcePath":"patient.name.family","targetPath":"patient.lastName","required":true},{"sourcePath":"patient.name.given","targetPath":"patient.firstName","required":false,"transform":"first"},{"sourcePath":"encounter.class","targetPath":"encounterClass","required":true},{"sourcePath":"payer.payerType","targetPath":"payerType","required":true},{"sourcePath":"facility.name","targetPath":"facilityName","required":false},{"sourcePath":"correlationId","targetPath":"correlationId","required":true}]'::jsonb
+    '[{"sourcePath":"notificationType","targetPath":"notificationType","required":true},{"sourcePath":"admission.admissionDateTime","targetPath":"admissionDateTime","required":true,"transform":"dateIso"},{"sourcePath":"patient.name.family","targetPath":"patient.lastName","required":true},{"sourcePath":"patient.name.given","targetPath":"patient.firstName","required":false,"transform":"first"},{"sourcePath":"encounter.class","targetPath":"encounterClass","required":true},{"sourcePath":"payer.payerType","targetPath":"payerType","required":true},{"sourcePath":"facility.name","targetPath":"facilityName","required":false},{"sourcePath":"correlationId","targetPath":"correlationId","required":true},{"sourcePath":"patient.memberId","targetPath":"patient.memberId","required":false},{"sourcePath":"patient.mrn","targetPath":"patient.mrn","required":false},{"sourcePath":"patient.birthDate","targetPath":"patient.birthDate","required":false},{"sourcePath":"patient.gender","targetPath":"patient.gender","required":false},{"sourcePath":"patient.phone","targetPath":"patient.phone","required":false},{"sourcePath":"patient.address.line","targetPath":"patient.address.line1","required":false,"transform":"first"},{"sourcePath":"patient.address.city","targetPath":"patient.address.city","required":false},{"sourcePath":"patient.address.state","targetPath":"patient.address.state","required":false},{"sourcePath":"patient.address.postalCode","targetPath":"patient.address.postalCode","required":false},{"sourcePath":"encounter.visitId","targetPath":"encounter.visitId","required":false},{"sourcePath":"encounter.status","targetPath":"encounter.status","required":false},{"sourcePath":"encounter.locationDisplay","targetPath":"encounter.locationDisplay","required":false},{"sourcePath":"facility.npi","targetPath":"facilityNpi","required":false},{"sourcePath":"payer.name","targetPath":"payerName","required":false},{"sourcePath":"coverage.subscriberId","targetPath":"coverage.subscriberId","required":false},{"sourcePath":"coverage.status","targetPath":"coverage.status","required":false},{"sourcePath":"coverage.plan","targetPath":"coverage.plan","required":false},{"sourcePath":"coverage.groupNumber","targetPath":"coverage.groupNumber","required":false},{"sourcePath":"providers.0.npi","targetPath":"attendingProviderNpi","required":false},{"sourcePath":"providers.0.name.family","targetPath":"attendingProviderLastName","required":false},{"sourcePath":"providers.0.name.given","targetPath":"attendingProviderFirstName","required":false,"transform":"first"}]'::jsonb
   ),
   (
     '33333333-3333-4333-8333-333333333002',
@@ -148,7 +190,7 @@ values
     1,
     'AdmissionEvent',
     'JSON',
-    '[{"sourcePath":"notificationType","targetPath":"notificationType","required":true},{"sourcePath":"admission.admissionDateTime","targetPath":"admissionDateTime","required":true},{"sourcePath":"patient.name.family","targetPath":"PatientLastName","required":true},{"sourcePath":"patient.name.given","targetPath":"PatientFirstName","required":false,"transform":"first"},{"sourcePath":"encounter.class","targetPath":"EncounterClass__c","required":true},{"sourcePath":"payer.payerType","targetPath":"PayerType__c","required":true},{"sourcePath":"correlationId","targetPath":"correlationId","required":true}]'::jsonb
+    '[{"sourcePath":"notificationType","targetPath":"notificationType","required":true},{"sourcePath":"admission.admissionDateTime","targetPath":"admissionDateTime","required":true},{"sourcePath":"patient.name.family","targetPath":"PatientLastName","required":true},{"sourcePath":"patient.name.given","targetPath":"PatientFirstName","required":false,"transform":"first"},{"sourcePath":"encounter.class","targetPath":"EncounterClass__c","required":true},{"sourcePath":"payer.payerType","targetPath":"PayerType__c","required":true},{"sourcePath":"correlationId","targetPath":"correlationId","required":true},{"sourcePath":"patient.memberId","targetPath":"MemberId__c","required":false},{"sourcePath":"patient.mrn","targetPath":"MRN__c","required":false},{"sourcePath":"patient.birthDate","targetPath":"DateOfBirth__c","required":false},{"sourcePath":"patient.gender","targetPath":"Gender__c","required":false},{"sourcePath":"patient.phone","targetPath":"Phone__c","required":false},{"sourcePath":"patient.address.line","targetPath":"AddressLine1__c","required":false,"transform":"first"},{"sourcePath":"patient.address.city","targetPath":"City__c","required":false},{"sourcePath":"patient.address.state","targetPath":"State__c","required":false},{"sourcePath":"patient.address.postalCode","targetPath":"PostalCode__c","required":false},{"sourcePath":"encounter.visitId","targetPath":"VisitId__c","required":false},{"sourcePath":"encounter.status","targetPath":"EncounterStatus__c","required":false},{"sourcePath":"encounter.locationDisplay","targetPath":"LocationName__c","required":false},{"sourcePath":"facility.name","targetPath":"FacilityName__c","required":false},{"sourcePath":"facility.npi","targetPath":"FacilityNPI__c","required":false},{"sourcePath":"payer.name","targetPath":"PayerName__c","required":false},{"sourcePath":"coverage.subscriberId","targetPath":"SubscriberId__c","required":false},{"sourcePath":"coverage.plan","targetPath":"Plan__c","required":false},{"sourcePath":"providers.0.npi","targetPath":"ProviderNPI__c","required":false},{"sourcePath":"providers.0.name.family","targetPath":"ProviderLastName__c","required":false},{"sourcePath":"providers.0.name.given","targetPath":"ProviderFirstName__c","required":false,"transform":"first"}]'::jsonb
   ),
   (
     '33333333-3333-4333-8333-333333333003',
@@ -156,6 +198,6 @@ values
     1,
     'AdmissionEvent',
     'JSON',
-    '[{"sourcePath":"notificationType","targetPath":"notificationType","required":true},{"sourcePath":"admission.admissionDateTime","targetPath":"AdmissionDateTime","required":true},{"sourcePath":"patient.name.family","targetPath":"MemberLastName","required":true},{"sourcePath":"patient.name.given","targetPath":"MemberFirstName","required":false,"transform":"first"},{"sourcePath":"encounter.class","targetPath":"EncounterClass","required":true},{"sourcePath":"payer.payerType","targetPath":"PayerType","required":true},{"sourcePath":"correlationId","targetPath":"correlationId","required":true}]'::jsonb
+    '[{"sourcePath":"notificationType","targetPath":"notificationType","required":true},{"sourcePath":"admission.admissionDateTime","targetPath":"AdmissionDateTime","required":true},{"sourcePath":"admission.admissionDateTime","targetPath":"CheckInDateTime","required":false},{"sourcePath":"patient.name.family","targetPath":"MemberLastName","required":true},{"sourcePath":"patient.name.given","targetPath":"MemberFirstName","required":false,"transform":"first"},{"sourcePath":"encounter.class","targetPath":"EncounterClass","required":true},{"sourcePath":"payer.payerType","targetPath":"PayerType","required":true},{"sourcePath":"correlationId","targetPath":"correlationId","required":true},{"sourcePath":"patient.memberId","targetPath":"MemberID","required":false},{"sourcePath":"patient.mrn","targetPath":"MRN","required":false},{"sourcePath":"patient.birthDate","targetPath":"DateOfBirth","required":false},{"sourcePath":"patient.gender","targetPath":"Gender","required":false},{"sourcePath":"patient.phone","targetPath":"PhoneNumber","required":false},{"sourcePath":"patient.address.line","targetPath":"AddressLine1","required":false,"transform":"first"},{"sourcePath":"patient.address.city","targetPath":"City","required":false},{"sourcePath":"patient.address.state","targetPath":"State","required":false},{"sourcePath":"patient.address.postalCode","targetPath":"PostalCode","required":false},{"sourcePath":"encounter.visitId","targetPath":"VisitID","required":false},{"sourcePath":"encounter.status","targetPath":"EncounterStatus","required":false},{"sourcePath":"encounter.locationDisplay","targetPath":"EncounterLocationName","required":false},{"sourcePath":"facility.name","targetPath":"FacilityName","required":false},{"sourcePath":"facility.npi","targetPath":"FacilityNPI","required":false},{"sourcePath":"payer.name","targetPath":"PayerName","required":false},{"sourcePath":"coverage.subscriberId","targetPath":"SubscriberID","required":false},{"sourcePath":"coverage.status","targetPath":"CoverageStatus","required":false},{"sourcePath":"coverage.plan","targetPath":"Plan","required":false},{"sourcePath":"coverage.groupNumber","targetPath":"GroupNumber","required":false},{"sourcePath":"providers.0.npi","targetPath":"ProviderNPI","required":false},{"sourcePath":"providers.0.name.family","targetPath":"ProviderLastName","required":false},{"sourcePath":"providers.0.name.given","targetPath":"ProviderFirstName","required":false,"transform":"first"}]'::jsonb
   )
 on conflict (id) do nothing;

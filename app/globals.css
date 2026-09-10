@@ -1,26 +1,83 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #eef2f1;
+  --foreground: #15202b;
+  --surface: #f7f9f8;
+  --surface-raised: #ffffff;
+  --muted: #5b6b76;
+  --subtle: #8a97a0;
+  --line: #d5dde2;
+  --line-strong: #b8c4cc;
+  --accent: #0f6b66;
+  --accent-soft: #d7ecea;
+  --danger: #9b2c2c;
+  --danger-soft: #f3dede;
+  --success: #1f6b45;
+  --success-soft: #d9ece2;
+  --warn: #8a5a12;
+  --warn-soft: #f3e7d2;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-muted: var(--muted);
+  --color-subtle: var(--subtle);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  color-scheme: light;
 }
 
 body {
-  background: var(--background);
+  background:
+    radial-gradient(1200px 480px at 0% -10%, #dceae8 0%, transparent 55%),
+    radial-gradient(900px 420px at 100% 0%, #e4e9f0 0%, transparent 50%),
+    var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), "Source Sans 3", sans-serif;
+  min-height: 100vh;
+}
+
+@keyframes noa-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes noa-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.noa-animate-main {
+  animation: noa-fade-up 420ms ease-out both;
+}
+
+.noa-animate-nav {
+  animation: noa-fade-in 500ms ease-out both;
 }

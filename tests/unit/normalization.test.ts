@@ -29,8 +29,13 @@ describe("AdmissionNormalizationService", () => {
     expect(admission.payer.payerType).toBe("MEDICARE");
     expect(admission.facility.name).toBe("Synthetic General Hospital");
     expect(admission.coverage.subscriberId).toBe("SYN-MBI-000111");
+    expect(admission.patient.memberId).toBe("SYN-MBI-000111");
+    expect(admission.patient.mrn).toBe("SYN-MRN-10001");
+    expect(admission.encounter.visitId).toBe("VISIT-001");
+    expect(admission.encounter.locationDisplay).toBe("4 South / Room 402");
     expect(admission.diagnoses[0]?.code).toBe("J18.9");
     expect(admission.providers[0]?.name?.family).toBe("SYNTHETIC");
+    expect(admission.providers[0]?.npi).toBe("1999999999");
     expect(admission.sourceMetadata.bundleId).toBe(
       "synthetic-admission-medicare-inpatient-001"
     );

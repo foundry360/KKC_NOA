@@ -1,4 +1,5 @@
 import { AppShell } from "@/components/layout/app-shell";
+import { Panel } from "@/components/ui/primitives";
 
 export default function PlaceholderPage({
   title,
@@ -9,10 +10,9 @@ export default function PlaceholderPage({
 }) {
   return (
     <AppShell title={title}>
-      <p className="text-black/70 dark:text-white/70">{blurb}</p>
-      <p className="mt-4 font-mono text-xs text-black/45 dark:text-white/45">
-        Placeholder — implemented in the UI cascade step after the pipeline works.
-      </p>
+      <Panel>
+        <p className="text-sm text-muted">{blurb}</p>
+      </Panel>
     </AppShell>
   );
 }
