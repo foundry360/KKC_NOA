@@ -322,7 +322,7 @@ alter table audit_events enable row level security;
 alter table errors enable row level security;
 alter table dead_letters enable row level security;
 
--- Authenticated admins can read operational data (POC).
+-- Authenticated admins can read operational data (POC). Idempotent for re-runs.
 do $$
 declare
   t text;
@@ -351,6 +351,11 @@ begin
     'dead_letters'
   ]
   loop
+    execute format(
+      'drop policy if exists %I on %I;',
+      t || '_select_authenticated',
+      t
+    );
     execute format(
       'create policy %I on %I for select to authenticated using (true);',
       t || '_select_authenticated',

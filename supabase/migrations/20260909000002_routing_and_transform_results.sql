@@ -40,6 +40,11 @@ begin
   foreach t in array array['routing_selections', 'transformation_results']
   loop
     execute format(
+      'drop policy if exists %I on %I;',
+      t || '_select_authenticated',
+      t
+    );
+    execute format(
       'create policy %I on %I for select to authenticated using (true);',
       t || '_select_authenticated',
       t
