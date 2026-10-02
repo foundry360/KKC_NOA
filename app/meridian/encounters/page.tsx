@@ -3,14 +3,18 @@ import { MeridianShell } from "@/components/meridian/shell";
 import { formatDt } from "@/components/meridian/patient-banner";
 import {
   FACILITIES,
-  getPatient,
   listEncounters,
+  searchPatients,
 } from "@/src/meridian/store/runtime";
 
 export const dynamic = "force-dynamic";
 
 export default async function EncountersPage() {
-  const encounters = listEncounters();
+  const [encounters, patients] = await Promise.all([
+    listEncounters(),
+    searchPatients(""),
+  ]);
+  const patientById = new Map(patients.map((p) => [p.id, p]));
 
   return (
     <MeridianShell title="Encounters">
@@ -20,7 +24,7 @@ export default async function EncountersPage() {
             Encounters / Admissions
           </h1>
           <p className="text-[14px] text-[var(--mh-muted)]">
-            Active and historical encounters in this session
+            Active and historical encounters
           </p>
         </div>
         <Link href="/meridian/patients/new" className="mh-btn">
@@ -51,7 +55,7 @@ export default async function EncountersPage() {
               </tr>
             ) : (
               encounters.map((enc) => {
-                const patient = getPatient(enc.patientId);
+                const patient = patientById.get(enc.patientId);
                 const facility = FACILITIES.find((f) => f.id === enc.facilityId);
                 return (
                   <tr key={enc.id}>

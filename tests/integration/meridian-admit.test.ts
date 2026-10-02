@@ -1,20 +1,14 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { setIngestRuntime } from "@/src/infrastructure/composition/ingest";
 import { createMemoryIngestRuntime } from "@/src/infrastructure/composition/ingest";
-import { admitPatient, getMeridianStore } from "@/src/meridian/store/runtime";
+import { admitPatient, setMeridianRepository } from "@/src/meridian/store/runtime";
+import { createMemoryMeridianRepository } from "@/src/meridian/store/repository";
 import { SEED_PATIENTS } from "@/src/meridian/data/seed";
 
 describe("Meridian admit → NOA", () => {
   beforeEach(() => {
     setIngestRuntime(createMemoryIngestRuntime());
-    // reset meridian store by bumping via reassignment
-    const g = globalThis as typeof globalThis & {
-      __meridianStore?: unknown;
-      __meridianStoreVersion?: number;
-    };
-    g.__meridianStore = undefined;
-    g.__meridianStoreVersion = undefined;
-    void getMeridianStore();
+    setMeridianRepository(createMemoryMeridianRepository());
   });
 
   it("admits John Smith and reaches ACKNOWLEDGED via in-process NOA", async () => {

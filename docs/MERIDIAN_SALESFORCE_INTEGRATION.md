@@ -99,6 +99,25 @@ Known edge: if the function crashes after Salesforce created the record but
 before the status write, the row is reclaimable after 120 s and a retry could
 create a second record. Acceptable for the demo.
 
+## Meridian persistence
+
+Meridian stores its EMR data in Supabase (migration
+`20261002000007_meridian_persistence.sql`), separate from NOA's tables:
+`meridian_patients`, `meridian_encounters`, `meridian_fhir_events` (the FHIR
+Bundle sent to Salesforce, as `jsonb`), `meridian_notifications`, and
+`meridian_salesforce_submissions` (Meridian's attempt history). Records are
+jsonb documents with indexed lookup columns; RLS is on with no policies.
+
+- `src/meridian/store/repository.ts` — `MeridianRepository` interface + in-memory implementation.
+- `src/meridian/store/supabase-repository.ts` — Supabase implementation; inserts seed
+  patients/encounters on first use without overwriting edits.
+- `src/meridian/store/runtime.ts` — picks Supabase when the service role is configured,
+  otherwise memory (`MERIDIAN_STORE=memory` forces memory; tests call `setMeridianRepository`).
+
+This makes admissions, payloads, and Retry work across server instances
+(Vercel) and restarts. The Salesforce status shown in Meridian is merged with
+the Edge Function's durable row, which wins on status and record id.
+
 ## Database
 
 `public.meridian_integration_submissions`: `admission_id`, `integration_type`,

@@ -16,11 +16,13 @@ export default async function NotificationStatusPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const notification = getNotification(id);
+  const notification = await getNotification(id);
   if (!notification) notFound();
-  const patient = getPatient(notification.patientId);
-  const encounter = getEncounter(notification.encounterId);
-  const fhir = findFhirByEncounter(notification.encounterId);
+  const [patient, encounter, fhir] = await Promise.all([
+    getPatient(notification.patientId),
+    getEncounter(notification.encounterId),
+    findFhirByEncounter(notification.encounterId),
+  ]);
 
   return (
     <MeridianShell title="Admission Notification">

@@ -39,15 +39,17 @@ export default async function AdmissionConfirmationPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const encounter = getEncounter(id);
+  const encounter = await getEncounter(id);
   if (!encounter) notFound();
-  const patient = getPatient(encounter.patientId);
+  const [patient, fhir, notification, salesforce, sfInFlight] = await Promise.all([
+    getPatient(encounter.patientId),
+    findFhirByEncounter(encounter.id),
+    findNotificationByEncounter(encounter.id),
+    getSalesforceSubmission(encounter.id),
+    isSalesforceSubmissionInFlight(encounter.id),
+  ]);
   if (!patient) notFound();
   const facility = FACILITIES.find((f) => f.id === encounter.facilityId);
-  const fhir = findFhirByEncounter(encounter.id);
-  const notification = findNotificationByEncounter(encounter.id);
-  const salesforce = getSalesforceSubmission(encounter.id);
-  const sfInFlight = isSalesforceSubmissionInFlight(encounter.id);
   const payload = fhir ? serializeAdmissionPayload(fhir.bundle) : null;
   const canSubmit =
     !!fhir &&

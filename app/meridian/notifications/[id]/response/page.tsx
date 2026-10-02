@@ -15,9 +15,9 @@ export default async function PayerResponsePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const notification = getNotification(id);
+  const notification = await getNotification(id);
   if (!notification) notFound();
-  const encounter = getEncounter(notification.encounterId);
+  const encounter = await getEncounter(notification.encounterId);
   const accepted =
     notification.processingState === "ACKNOWLEDGED" ||
     Boolean(notification.acknowledgement?.ackId);

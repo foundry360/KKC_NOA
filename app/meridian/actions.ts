@@ -51,7 +51,7 @@ export async function submitAdmissionToSalesforceAction(admissionId: string) {
 
 export async function createPatientAction(input: CreatePatientInput) {
   try {
-    const patient = createPatient(input);
+    const patient = await createPatient(input);
     return { ok: true as const, patientId: patient.id, mrn: patient.mrn };
   } catch (e) {
     return {
@@ -63,7 +63,7 @@ export async function createPatientAction(input: CreatePatientInput) {
 
 export async function updatePatientAction(input: UpdatePatientInput) {
   try {
-    const patient = updatePatient(input);
+    const patient = await updatePatient(input);
     return { ok: true as const, patientId: patient.id };
   } catch (e) {
     return {
@@ -75,7 +75,7 @@ export async function updatePatientAction(input: UpdatePatientInput) {
 
 export async function dischargeEncounterAction(encounterId: string) {
   try {
-    const encounter = dischargeEncounter(encounterId);
+    const encounter = await dischargeEncounter(encounterId);
     return { ok: true as const, encounterId: encounter.id };
   } catch (e) {
     return {
@@ -86,7 +86,7 @@ export async function dischargeEncounterAction(encounterId: string) {
 }
 
 export async function searchPatientsAction(query: string) {
-  const matches = searchPatients(query).slice(0, 8);
+  const matches = (await searchPatients(query)).slice(0, 8);
   return matches.map((p) => ({
     id: p.id,
     mrn: p.mrn,

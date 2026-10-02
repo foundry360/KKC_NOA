@@ -16,10 +16,12 @@ export default async function FhirEventPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const event = getFhirEvent(id);
+  const event = await getFhirEvent(id);
   if (!event) notFound();
-  const patient = getPatient(event.patientId);
-  const notification = findNotificationByEncounter(event.encounterId);
+  const [patient, notification] = await Promise.all([
+    getPatient(event.patientId),
+    findNotificationByEncounter(event.encounterId),
+  ]);
   const entries = Array.isArray(
     (event.bundle as { entry?: unknown[] }).entry
   )

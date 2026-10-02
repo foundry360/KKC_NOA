@@ -18,9 +18,9 @@ export default async function EditPatientPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const patient = getPatient(id);
+  const patient = await getPatient(id);
   if (!patient) notFound();
-  const encounter = getActiveEncounter(id);
+  const encounter = await getActiveEncounter(id);
 
   return (
     <MeridianShell

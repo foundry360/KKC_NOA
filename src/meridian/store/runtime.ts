@@ -1,11 +1,9 @@
 import { randomUUID } from "node:crypto";
 import {
-  createSeedEncounters,
   DEPARTMENTS,
   FACILITIES,
   PAYERS,
   PROVIDERS,
-  SEED_PATIENTS,
 } from "@/src/meridian/data/seed";
 import type {
   AdmitInput,
@@ -21,125 +19,119 @@ import type {
 import { buildAdmissionBundle } from "@/src/meridian/fhir/build-admission-bundle";
 import { sendFhirAdmissionEvent } from "@/src/meridian/services/noa-client";
 import { submitAdmissionPayload } from "@/src/meridian/services/salesforce-client";
+import { createSupabaseServiceClient } from "@/src/infrastructure/supabase/client";
+import {
+  byAdmittedDesc,
+  createMemoryMeridianRepository,
+  type MeridianRepository,
+} from "@/src/meridian/store/repository";
+import { createSupabaseMeridianRepository } from "@/src/meridian/store/supabase-repository";
 
-export type MeridianStore = {
-  patients: Map<string, Patient>;
-  encounters: Map<string, Encounter>;
-  fhirEvents: Map<string, FhirEventRecord>;
-  notifications: Map<string, NotificationTrack>;
-  /** patientId → active encounter id */
-  activeEncounterByPatient: Map<string, string>;
-  /** admission (encounter) id → Salesforce integration status */
-  salesforceSubmissions: Map<string, SalesforceSubmissionRecord>;
-  /** admission ids with a Salesforce call currently in flight in this process */
-  salesforceInFlight: Set<string>;
+const globalRef = globalThis as typeof globalThis & {
+  __meridianRepository?: MeridianRepository;
+  __meridianSalesforceInFlight?: Set<string>;
 };
 
-const STORE_VERSION = 3;
-
-const globalStore = globalThis as typeof globalThis & {
-  __meridianStore?: MeridianStore;
-  __meridianStoreVersion?: number;
-};
-
-function createStore(): MeridianStore {
-  const patients = new Map(SEED_PATIENTS.map((p) => [p.id, structuredClone(p)]));
-  const encounters = new Map<string, Encounter>();
-  const activeEncounterByPatient = new Map<string, string>();
-  const now = new Date().toISOString();
-  for (const enc of createSeedEncounters(now)) {
-    encounters.set(enc.id, enc);
-    activeEncounterByPatient.set(enc.patientId, enc.id);
+/**
+ * Supabase-backed when the service role is configured (required on Vercel,
+ * where requests may hit different instances); in-memory otherwise.
+ * MERIDIAN_STORE=memory forces the in-memory store.
+ */
+export function getMeridianRepository(): MeridianRepository {
+  if (!globalRef.__meridianRepository) {
+    const client =
+      process.env.MERIDIAN_STORE === "memory" ? null : createSupabaseServiceClient();
+    globalRef.__meridianRepository = client
+      ? createSupabaseMeridianRepository(client)
+      : createMemoryMeridianRepository();
   }
-  return {
-    patients,
-    encounters,
-    fhirEvents: new Map(),
-    notifications: new Map(),
-    activeEncounterByPatient,
-    salesforceSubmissions: new Map(),
-    salesforceInFlight: new Set(),
-  };
+  return globalRef.__meridianRepository;
 }
 
-export function getMeridianStore(): MeridianStore {
-  if (
-    !globalStore.__meridianStore ||
-    globalStore.__meridianStoreVersion !== STORE_VERSION
-  ) {
-    globalStore.__meridianStore = createStore();
-    globalStore.__meridianStoreVersion = STORE_VERSION;
-  }
-  return globalStore.__meridianStore;
+/** Test/demo hook: replace the repository (e.g. a fresh in-memory store). */
+export function setMeridianRepository(repository: MeridianRepository) {
+  globalRef.__meridianRepository = repository;
+  globalRef.__meridianSalesforceInFlight = new Set();
 }
 
-export function listCensus() {
-  const store = getMeridianStore();
-  const rows = [...store.patients.values()].map((patient) => {
-    const encId = store.activeEncounterByPatient.get(patient.id);
-    const encounter = encId ? store.encounters.get(encId) : undefined;
+function salesforceInFlight(): Set<string> {
+  globalRef.__meridianSalesforceInFlight ??= new Set();
+  return globalRef.__meridianSalesforceInFlight;
+}
+
+const isActive = (e: Encounter) => e.status !== "Discharged";
+
+export async function listCensus() {
+  const repo = getMeridianRepository();
+  const [patients, encounters] = await Promise.all([
+    repo.listPatients(),
+    repo.listEncounters(),
+  ]);
+  const activeByPatient = new Map<string, Encounter>();
+  for (const enc of [...encounters].sort(byAdmittedDesc)) {
+    if (isActive(enc) && !activeByPatient.has(enc.patientId)) {
+      activeByPatient.set(enc.patientId, enc);
+    }
+  }
+  return patients.map((patient) => {
+    const encounter = activeByPatient.get(patient.id);
     const facility = encounter
       ? FACILITIES.find((f) => f.id === encounter.facilityId)
       : undefined;
     return { patient, encounter, facility };
   });
-  return rows;
 }
 
 export function getPatient(id: string) {
-  return getMeridianStore().patients.get(id) ?? null;
+  return getMeridianRepository().getPatient(id);
 }
 
-export function getActiveEncounter(patientId: string) {
-  const store = getMeridianStore();
-  const encId = store.activeEncounterByPatient.get(patientId);
-  return encId ? store.encounters.get(encId) ?? null : null;
+export async function getActiveEncounter(patientId: string) {
+  const encounters = await getMeridianRepository().listEncountersForPatient(patientId);
+  return encounters.find(isActive) ?? null;
 }
 
 export function getEncounter(id: string) {
-  return getMeridianStore().encounters.get(id) ?? null;
+  return getMeridianRepository().getEncounter(id);
 }
 
 export function getFhirEvent(id: string) {
-  return getMeridianStore().fhirEvents.get(id) ?? null;
+  return getMeridianRepository().getFhirEvent(id);
 }
 
 export function getNotification(id: string) {
-  return getMeridianStore().notifications.get(id) ?? null;
+  return getMeridianRepository().getNotification(id);
 }
 
 export function findNotificationByEncounter(encounterId: string) {
-  const store = getMeridianStore();
-  return (
-    [...store.notifications.values()].find((n) => n.encounterId === encounterId) ??
-    null
-  );
+  return getMeridianRepository().findNotificationByEncounter(encounterId);
 }
 
 export function findFhirByEncounter(encounterId: string) {
-  const store = getMeridianStore();
-  return (
-    [...store.fhirEvents.values()].find((e) => e.encounterId === encounterId) ??
-    null
-  );
+  return getMeridianRepository().findFhirByEncounter(encounterId);
 }
 
 export function listFhirEventsForPatient(patientId: string) {
-  return [...getMeridianStore().fhirEvents.values()]
-    .filter((e) => e.patientId === patientId)
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return getMeridianRepository().listFhirEventsForPatient(patientId);
 }
 
 export function listNotificationsForPatient(patientId: string) {
-  return [...getMeridianStore().notifications.values()]
-    .filter((n) => n.patientId === patientId)
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return getMeridianRepository().listNotificationsForPatient(patientId);
 }
 
-export function searchPatients(query: string): Patient[] {
+export function listEncounters() {
+  return getMeridianRepository().listEncounters();
+}
+
+export function listEncountersForPatient(patientId: string) {
+  return getMeridianRepository().listEncountersForPatient(patientId);
+}
+
+export async function searchPatients(query: string): Promise<Patient[]> {
+  const patients = await getMeridianRepository().listPatients();
   const q = query.trim().toLowerCase();
-  if (!q) return [...getMeridianStore().patients.values()];
-  return [...getMeridianStore().patients.values()].filter(
+  if (!q) return patients;
+  return patients.filter(
     (p) =>
       p.mrn.toLowerCase().includes(q) ||
       p.family.toLowerCase().includes(q) ||
@@ -148,17 +140,17 @@ export function searchPatients(query: string): Patient[] {
   );
 }
 
-function nextMrn(store: MeridianStore): string {
+function nextMrn(patients: Patient[]): string {
   let max = 10020;
-  for (const p of store.patients.values()) {
+  for (const p of patients) {
     const m = /^MRN-(\d+)$/i.exec(p.mrn);
     if (m) max = Math.max(max, Number(m[1]));
   }
   return `MRN-${max + 1}`;
 }
 
-export function createPatient(input: CreatePatientInput): Patient {
-  const store = getMeridianStore();
+export async function createPatient(input: CreatePatientInput): Promise<Patient> {
+  const repo = getMeridianRepository();
   const family = input.family.trim();
   const given = input.given.map((g) => g.trim()).filter(Boolean);
   if (!family || given.length === 0) {
@@ -169,8 +161,9 @@ export function createPatient(input: CreatePatientInput): Patient {
     throw new Error("Member ID is required");
   }
 
-  const mrn = (input.mrn?.trim() || nextMrn(store)).toUpperCase();
-  if ([...store.patients.values()].some((p) => p.mrn === mrn)) {
+  const existing = await repo.listPatients();
+  const mrn = (input.mrn?.trim() || nextMrn(existing)).toUpperCase();
+  if (existing.some((p) => p.mrn === mrn)) {
     throw new Error(`MRN already exists: ${mrn}`);
   }
 
@@ -197,17 +190,17 @@ export function createPatient(input: CreatePatientInput): Patient {
     patient.address.line = ["—"];
   }
 
-  store.patients.set(patient.id, patient);
+  await repo.savePatient(patient);
   return structuredClone(patient);
 }
 
-export function updatePatient(input: UpdatePatientInput): Patient {
-  const store = getMeridianStore();
-  const existing = store.patients.get(input.id);
+export async function updatePatient(input: UpdatePatientInput): Promise<Patient> {
+  const repo = getMeridianRepository();
+  const existing = await repo.getPatient(input.id);
   if (!existing) throw new Error("Patient not found");
 
   if (input.mrn && input.mrn !== existing.mrn) {
-    const conflict = [...store.patients.values()].some(
+    const conflict = (await repo.listPatients()).some(
       (p) => p.id !== input.id && p.mrn === input.mrn
     );
     if (conflict) throw new Error(`MRN already exists: ${input.mrn}`);
@@ -240,30 +233,17 @@ export function updatePatient(input: UpdatePatientInput): Patient {
     existing.attendingProviderId = input.attendingProviderId || undefined;
   }
 
-  store.patients.set(existing.id, existing);
+  await repo.savePatient(existing);
   return structuredClone(existing);
 }
 
-export function dischargeEncounter(encounterId: string): Encounter {
-  const store = getMeridianStore();
-  const encounter = store.encounters.get(encounterId);
+export async function dischargeEncounter(encounterId: string): Promise<Encounter> {
+  const repo = getMeridianRepository();
+  const encounter = await repo.getEncounter(encounterId);
   if (!encounter) throw new Error("Encounter not found");
   encounter.status = "Discharged";
-  store.encounters.set(encounter.id, encounter);
-  if (store.activeEncounterByPatient.get(encounter.patientId) === encounter.id) {
-    store.activeEncounterByPatient.delete(encounter.patientId);
-  }
+  await repo.saveEncounter(encounter);
   return structuredClone(encounter);
-}
-
-export function listEncounters(): Encounter[] {
-  return [...getMeridianStore().encounters.values()].sort((a, b) =>
-    b.admittedAt.localeCompare(a.admittedAt)
-  );
-}
-
-export function listEncountersForPatient(patientId: string): Encounter[] {
-  return listEncounters().filter((e) => e.patientId === patientId);
 }
 
 export async function admitPatient(input: AdmitInput): Promise<{
@@ -271,8 +251,8 @@ export async function admitPatient(input: AdmitInput): Promise<{
   fhirEvent: FhirEventRecord;
   notification: NotificationTrack;
 }> {
-  const store = getMeridianStore();
-  const patient = store.patients.get(input.patientId);
+  const repo = getMeridianRepository();
+  const patient = await repo.getPatient(input.patientId);
   if (!patient) throw new Error("Patient not found");
 
   const facility = FACILITIES.find((f) => f.id === input.facilityId);
@@ -353,11 +333,11 @@ export async function admitPatient(input: AdmitInput): Promise<{
     timeline: send.timeline,
   };
 
-  store.encounters.set(encounter.id, encounter);
-  store.activeEncounterByPatient.set(patient.id, encounter.id);
-  store.fhirEvents.set(fhirEvent.id, fhirEvent);
-  store.notifications.set(notification.id, notification);
-  store.salesforceSubmissions.set(encounter.id, {
+  await repo.savePatient(patient);
+  await repo.saveEncounter(encounter);
+  await repo.saveFhirEvent(fhirEvent);
+  await repo.saveNotification(notification);
+  await repo.saveSalesforceSubmission({
     admissionId: encounter.id,
     patientId: patient.id,
     fhirEventId: fhirEvent.id,
@@ -375,12 +355,58 @@ export function serializeAdmissionPayload(bundle: Record<string, unknown>): stri
   return JSON.stringify(bundle, null, 2);
 }
 
-export function getSalesforceSubmission(admissionId: string) {
-  return getMeridianStore().salesforceSubmissions.get(admissionId) ?? null;
+const SUBMITTING_STALE_MS = 2 * 60_000;
+
+/**
+ * Meridian's submission record merged with the Edge Function's durable row,
+ * which is authoritative for status, record id, and attempt count.
+ */
+export async function getSalesforceSubmission(
+  admissionId: string
+): Promise<SalesforceSubmissionRecord | null> {
+  const repo = getMeridianRepository();
+  const [local, durable] = await Promise.all([
+    repo.getSalesforceSubmission(admissionId),
+    repo.getDurableSalesforceSubmission(admissionId),
+  ]);
+  if (!durable) return local;
+  const base: SalesforceSubmissionRecord = local ?? {
+    admissionId,
+    patientId: "",
+    fhirEventId: "",
+    integrationType: "SALESFORCE_ADMISSION",
+    status: "PENDING",
+    attemptCount: 0,
+    attempts: [],
+  };
+  const localIsNewer =
+    !!local?.lastAttemptAt &&
+    !!durable.updatedAt &&
+    Date.parse(local.lastAttemptAt) > Date.parse(durable.updatedAt) &&
+    durable.status !== "SUBMITTED";
+  if (localIsNewer) return base;
+  return {
+    ...base,
+    status: durable.status,
+    salesforceRecordId: durable.salesforceRecordId ?? base.salesforceRecordId,
+    salesforceRecordUrl: durable.salesforceRecordUrl ?? base.salesforceRecordUrl,
+    submittedAt: durable.submittedAt ?? base.submittedAt,
+    lastAttemptAt: durable.lastAttemptAt ?? base.lastAttemptAt,
+    errorType: durable.status === "SUBMITTED" ? undefined : durable.errorType ?? base.errorType,
+    errorMessage:
+      durable.status === "SUBMITTED" ? undefined : durable.errorMessage ?? base.errorMessage,
+    attemptCount: Math.max(durable.attemptCount, base.attemptCount),
+  };
 }
 
-export function isSalesforceSubmissionInFlight(admissionId: string) {
-  return getMeridianStore().salesforceInFlight.has(admissionId);
+export async function isSalesforceSubmissionInFlight(admissionId: string) {
+  if (salesforceInFlight().has(admissionId)) return true;
+  const record = await getSalesforceSubmission(admissionId);
+  return (
+    record?.status === "SUBMITTING" &&
+    !!record.lastAttemptAt &&
+    Date.now() - new Date(record.lastAttemptAt).getTime() < SUBMITTING_STALE_MS
+  );
 }
 
 const RESPONSE_STATUS: Record<string, SalesforceIntegrationStatus> = {
@@ -397,19 +423,35 @@ export type SalesforceSubmitResult =
 /**
  * Sends the admission's existing FHIR payload to Salesforce via the Edge
  * Function. Retries reuse the same stored Bundle; no new clinical event is
- * generated. Duplicate submissions are blocked locally (in-flight / already
+ * generated. Duplicates are blocked in-process (in-flight / already
  * SUBMITTED) and durably by the Edge Function's claim on admission_id.
  */
 export async function submitAdmissionToSalesforce(
   admissionId: string
 ): Promise<SalesforceSubmitResult> {
-  const store = getMeridianStore();
-  const fhirEvent = findFhirByEncounter(admissionId);
-  if (!fhirEvent) throw new Error("No FHIR admission event exists for this admission");
+  const repo = getMeridianRepository();
+  const inFlight = salesforceInFlight();
+  if (inFlight.has(admissionId)) {
+    const current = await getSalesforceSubmission(admissionId);
+    return {
+      outcome: "in_progress",
+      record: current ?? {
+        admissionId,
+        patientId: "",
+        fhirEventId: "",
+        integrationType: "SALESFORCE_ADMISSION",
+        status: "SUBMITTING",
+        attemptCount: 0,
+        attempts: [],
+      },
+    };
+  }
+  inFlight.add(admissionId);
+  try {
+    const fhirEvent = await repo.findFhirByEncounter(admissionId);
+    if (!fhirEvent) throw new Error("No FHIR admission event exists for this admission");
 
-  let record = store.salesforceSubmissions.get(admissionId);
-  if (!record) {
-    record = {
+    const record: SalesforceSubmissionRecord = (await getSalesforceSubmission(admissionId)) ?? {
       admissionId,
       patientId: fhirEvent.patientId,
       fhirEventId: fhirEvent.id,
@@ -418,72 +460,74 @@ export async function submitAdmissionToSalesforce(
       attemptCount: 0,
       attempts: [],
     };
-    store.salesforceSubmissions.set(admissionId, record);
-  }
+    record.patientId ||= fhirEvent.patientId;
+    record.fhirEventId ||= fhirEvent.id;
 
-  if (record.status === "SUBMITTED") {
-    return { outcome: "already_submitted", record: structuredClone(record) };
-  }
-  if (store.salesforceInFlight.has(admissionId)) {
-    return { outcome: "in_progress", record: structuredClone(record) };
-  }
-
-  store.salesforceInFlight.add(admissionId);
-  record.status = "SUBMITTING";
-  record.lastAttemptAt = new Date().toISOString();
-  try {
-    const response = await submitAdmissionPayload({
-      admissionId,
-      payload: serializeAdmissionPayload(fhirEvent.bundle),
-    });
-    const status = RESPONSE_STATUS[response.status] ?? "FAILED";
-    const success = response.success && status === "SUBMITTED" && !!response.salesforceRecordId;
-
-    record.status = success ? "SUBMITTED" : status === "SUBMITTED" ? "FAILED" : status;
-    record.attemptCount = response.attemptCount ?? record.attemptCount + 1;
-    if (success) {
-      record.salesforceRecordId = response.salesforceRecordId;
-      record.salesforceRecordUrl = response.salesforceRecordUrl;
-      record.submittedAt = response.submittedAt ?? new Date().toISOString();
-      record.errorType = undefined;
-      record.errorMessage = undefined;
-    } else {
-      record.errorType = response.errorType ?? "UNKNOWN";
-      record.errorMessage =
-        response.message ?? "Salesforce submission failed. Please retry.";
+    if (record.status === "SUBMITTED") {
+      return { outcome: "already_submitted", record };
     }
-    record.attempts.push({
-      attempt: record.attemptCount,
-      at: record.lastAttemptAt,
-      status: record.status,
-      httpStatus: response.httpStatus,
-      errorType: success ? undefined : record.errorType,
-    });
 
-    if (success) {
+    record.status = "SUBMITTING";
+    record.lastAttemptAt = new Date().toISOString();
+    await repo.saveSalesforceSubmission(record);
+
+    try {
+      const response = await submitAdmissionPayload({
+        admissionId,
+        payload: serializeAdmissionPayload(fhirEvent.bundle),
+      });
+      const status = RESPONSE_STATUS[response.status] ?? "FAILED";
+      const success =
+        response.success && status === "SUBMITTED" && !!response.salesforceRecordId;
+
+      record.status = success ? "SUBMITTED" : status === "SUBMITTED" ? "FAILED" : status;
+      record.attemptCount = response.attemptCount ?? record.attemptCount + 1;
+      if (success) {
+        record.salesforceRecordId = response.salesforceRecordId;
+        record.salesforceRecordUrl = response.salesforceRecordUrl;
+        record.submittedAt = response.submittedAt ?? new Date().toISOString();
+        record.errorType = undefined;
+        record.errorMessage = undefined;
+      } else {
+        record.errorType = response.errorType ?? "UNKNOWN";
+        record.errorMessage =
+          response.message ?? "Salesforce submission failed. Please retry.";
+      }
+      record.attempts.push({
+        attempt: record.attemptCount,
+        at: record.lastAttemptAt,
+        status: record.status,
+        httpStatus: response.httpStatus,
+        errorType: success ? undefined : record.errorType,
+      });
+      await repo.saveSalesforceSubmission(record);
+
+      if (success) {
+        return {
+          outcome: response.duplicate ? "already_submitted" : "submitted",
+          record,
+        };
+      }
       return {
-        outcome: response.duplicate ? "already_submitted" : "submitted",
-        record: structuredClone(record),
+        outcome: record.status === "SUBMITTING" ? "in_progress" : "failed",
+        record,
       };
+    } catch {
+      record.status = "RETRYABLE";
+      record.attemptCount += 1;
+      record.errorType = "SALESFORCE_CONNECTION";
+      record.errorMessage = "Salesforce submission failed. Please retry.";
+      record.attempts.push({
+        attempt: record.attemptCount,
+        at: record.lastAttemptAt,
+        status: record.status,
+        errorType: record.errorType,
+      });
+      await repo.saveSalesforceSubmission(record).catch(() => {});
+      return { outcome: "failed", record };
     }
-    return {
-      outcome: record.status === "SUBMITTING" ? "in_progress" : "failed",
-      record: structuredClone(record),
-    };
-  } catch {
-    record.status = "RETRYABLE";
-    record.attemptCount += 1;
-    record.errorType = "SALESFORCE_CONNECTION";
-    record.errorMessage = "Salesforce submission failed. Please retry.";
-    record.attempts.push({
-      attempt: record.attemptCount,
-      at: record.lastAttemptAt,
-      status: record.status,
-      errorType: record.errorType,
-    });
-    return { outcome: "failed", record: structuredClone(record) };
   } finally {
-    store.salesforceInFlight.delete(admissionId);
+    inFlight.delete(admissionId);
   }
 }
 

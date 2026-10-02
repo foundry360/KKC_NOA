@@ -5,11 +5,14 @@ import {
 } from "@/src/infrastructure/composition/ingest";
 import {
   admitPatient,
-  getMeridianStore,
+  getEncounter,
+  getMeridianRepository,
   getSalesforceSubmission,
   serializeAdmissionPayload,
+  setMeridianRepository,
   submitAdmissionToSalesforce,
 } from "@/src/meridian/store/runtime";
+import { createMemoryMeridianRepository } from "@/src/meridian/store/repository";
 import { SEED_PATIENTS } from "@/src/meridian/data/seed";
 import {
   SALESFORCE_PAYLOAD_MAX_LENGTH,
@@ -103,13 +106,7 @@ async function admitJohnSmith() {
 describe("Meridian admission → Supabase Edge Function → Salesforce Admission__c", () => {
   beforeEach(() => {
     setIngestRuntime(createMemoryIngestRuntime());
-    const g = globalThis as typeof globalThis & {
-      __meridianStore?: unknown;
-      __meridianStoreVersion?: number;
-    };
-    g.__meridianStore = undefined;
-    g.__meridianStoreVersion = undefined;
-    void getMeridianStore();
+    setMeridianRepository(createMemoryMeridianRepository());
     vi.stubEnv("SUPABASE_URL", SUPABASE_URL);
     vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "test-service-role");
     vi.stubEnv("SALESFORCE_SUBMIT_FUNCTION_URL", "");
@@ -123,7 +120,7 @@ describe("Meridian admission → Supabase Edge Function → Salesforce Admission
   it("admission generates a FHIR payload and a PENDING Salesforce submission", async () => {
     const { encounter, fhirEvent } = await admitJohnSmith();
     expect(fhirEvent.bundle.resourceType).toBe("Bundle");
-    const record = getSalesforceSubmission(encounter.id);
+    const record = await getSalesforceSubmission(encounter.id);
     expect(record).toMatchObject({ status: "PENDING", attemptCount: 0, fhirEventId: fhirEvent.id });
 
     const payload = serializeAdmissionPayload(fhirEvent.bundle);
@@ -151,7 +148,7 @@ describe("Meridian admission → Supabase Edge Function → Salesforce Admission
     expect(integration.salesforceBodies).toHaveLength(1);
     expect(integration.salesforceBodies[0].Payload__c).toBe(serializeAdmissionPayload(fhirEvent.bundle));
     expect(JSON.parse(integration.salesforceBodies[0].Payload__c)).toEqual(fhirEvent.bundle);
-    expect(getSalesforceSubmission(encounter.id)?.status).toBe("SUBMITTED");
+    expect((await getSalesforceSubmission(encounter.id))?.status).toBe("SUBMITTED");
   });
 
   it("a failed submission is not marked successful and the admission is unaffected", async () => {
@@ -164,15 +161,17 @@ describe("Meridian admission → Supabase Edge Function → Salesforce Admission
     expect(result.record.salesforceRecordId).toBeUndefined();
     expect(result.record.errorType).toBe("SALESFORCE_CONNECTION");
     expect(result.record.errorMessage).not.toMatch(/Bearer|secret|tok/i);
-    expect(getMeridianStore().encounters.get(encounter.id)?.status).toBe("Admitted");
+    expect((await getEncounter(encounter.id))?.status).toBe("Admitted");
   });
 
   it("retry resubmits the same stored payload and records the new attempt", async () => {
     const integration = installIntegration({
       createResponses: [json(503, [{ errorCode: "SERVER_UNAVAILABLE" }])],
     });
-    const { encounter } = await admitJohnSmith();
-    const eventCountBefore = getMeridianStore().fhirEvents.size;
+    const { encounter, fhirEvent } = await admitJohnSmith();
+    const eventCountBefore = (
+      await getMeridianRepository().listFhirEventsForPatient(fhirEvent.patientId)
+    ).length;
 
     expect((await submitAdmissionToSalesforce(encounter.id)).record.status).toBe("RETRYABLE");
     const retry = await submitAdmissionToSalesforce(encounter.id);
@@ -180,7 +179,9 @@ describe("Meridian admission → Supabase Edge Function → Salesforce Admission
     expect(retry.record.attemptCount).toBe(2);
     expect(retry.record.attempts.map((a) => a.status)).toEqual(["RETRYABLE", "SUBMITTED"]);
     expect(integration.salesforceBodies[0].Payload__c).toBe(integration.salesforceBodies[1].Payload__c);
-    expect(getMeridianStore().fhirEvents.size).toBe(eventCountBefore);
+    expect(
+      (await getMeridianRepository().listFhirEventsForPatient(fhirEvent.patientId)).length
+    ).toBe(eventCountBefore);
   });
 
   it("prevents duplicate Salesforce records (double click and post-success resubmit)", async () => {
@@ -204,11 +205,47 @@ describe("Meridian admission → Supabase Edge Function → Salesforce Admission
     const { encounter } = await admitJohnSmith();
     await submitAdmissionToSalesforce(encounter.id);
 
-    getMeridianStore().salesforceSubmissions.get(encounter.id)!.status = "PENDING";
+    const repo = getMeridianRepository();
+    const local = (await repo.getSalesforceSubmission(encounter.id))!;
+    await repo.saveSalesforceSubmission({ ...local, status: "PENDING" });
     const again = await submitAdmissionToSalesforce(encounter.id);
     expect(again.outcome).toBe("already_submitted");
     expect(again.record.salesforceRecordId).toBe("a0X000000000001AAA");
     expect(integration.salesforceBodies).toHaveLength(1);
+  });
+
+  it("displayed status defers to the durable Edge Function row", async () => {
+    const base = createMemoryMeridianRepository();
+    const durable = {
+      status: "SUBMITTED" as const,
+      salesforceRecordId: "a0XDURABLE0000001",
+      salesforceRecordUrl: `${INSTANCE}/a0XDURABLE0000001`,
+      submittedAt: "2026-10-02T18:00:00.000Z",
+      attemptCount: 2,
+      updatedAt: "2026-10-02T18:00:00.000Z",
+    };
+    setMeridianRepository({ ...base, getDurableSalesforceSubmission: async () => durable });
+
+    const { encounter } = await admitJohnSmith();
+    const local = (await base.getSalesforceSubmission(encounter.id))!;
+    await base.saveSalesforceSubmission({
+      ...local,
+      status: "RETRYABLE",
+      errorType: "SALESFORCE_CONNECTION",
+      errorMessage: "Could not reach the Salesforce integration service. Please retry.",
+      lastAttemptAt: "2026-10-02T17:59:00.000Z",
+    });
+
+    const shown = await getSalesforceSubmission(encounter.id);
+    expect(shown).toMatchObject({
+      status: "SUBMITTED",
+      salesforceRecordId: "a0XDURABLE0000001",
+      attemptCount: 2,
+    });
+    expect(shown?.errorMessage).toBeUndefined();
+
+    const resubmit = await submitAdmissionToSalesforce(encounter.id);
+    expect(resubmit.outcome).toBe("already_submitted");
   });
 
   it("reports a sanitized configuration failure when Supabase is not configured", async () => {

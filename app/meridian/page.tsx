@@ -11,7 +11,8 @@ export default async function MeridianCensusPage({
   searchParams: Promise<{ q?: string; unit?: string; class?: string; payer?: string; status?: string }>;
 }) {
   const sp = await searchParams;
-  let rows = listCensus();
+  const census = await listCensus();
+  let rows = census;
 
   if (sp.q?.trim()) {
     const q = sp.q.trim().toLowerCase();
@@ -41,7 +42,7 @@ export default async function MeridianCensusPage({
 
   const units = [
     ...new Set(
-      listCensus()
+      census
         .map((r) => r.encounter?.unit)
         .filter(Boolean) as string[]
     ),

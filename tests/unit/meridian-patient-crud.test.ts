@@ -3,27 +3,23 @@ import {
   createPatient,
   dischargeEncounter,
   getActiveEncounter,
-  getMeridianStore,
+  getEncounter,
   getPatient,
   searchPatients,
+  setMeridianRepository,
   updatePatient,
 } from "@/src/meridian/store/runtime";
+import { createMemoryMeridianRepository } from "@/src/meridian/store/repository";
 import { PAYERS } from "@/src/meridian/data/seed";
 
 describe("meridian patient EMR store", () => {
   beforeEach(() => {
-    const g = globalThis as typeof globalThis & {
-      __meridianStore?: unknown;
-      __meridianStoreVersion?: number;
-    };
-    delete g.__meridianStore;
-    delete g.__meridianStoreVersion;
-    getMeridianStore();
+    setMeridianRepository(createMemoryMeridianRepository());
   });
 
-  it("creates, searches, updates, and discharges", () => {
+  it("creates, searches, updates, and discharges", async () => {
     const payer = PAYERS[0];
-    const created = createPatient({
+    const created = await createPatient({
       family: "Nguyen",
       given: ["Linh"],
       sex: "female",
@@ -46,27 +42,21 @@ describe("meridian patient EMR store", () => {
     });
 
     expect(created.mrn).toMatch(/^MRN-\d+$/);
-    expect(searchPatients("Nguyen").some((p) => p.id === created.id)).toBe(
-      true
-    );
-    expect(searchPatients(created.mrn)[0]?.id).toBe(created.id);
+    expect((await searchPatients("Nguyen")).some((p) => p.id === created.id)).toBe(true);
+    expect((await searchPatients(created.mrn))[0]?.id).toBe(created.id);
 
-    const updated = updatePatient({
+    const updated = await updatePatient({
       id: created.id,
       phone: "904-555-0100",
       diagnoses: ["Asthma", "Hypertension"],
     });
-    expect(getPatient(created.id)?.phone).toBe("904-555-0100");
+    expect((await getPatient(created.id))?.phone).toBe("904-555-0100");
     expect(updated.diagnoses).toEqual(["Asthma", "Hypertension"]);
 
-    const store = getMeridianStore();
-    const seedActive = [...store.activeEncounterByPatient.entries()][0];
-    if (seedActive) {
-      const [patientId, encId] = seedActive;
-      expect(getActiveEncounter(patientId)?.id).toBe(encId);
-      dischargeEncounter(encId);
-      expect(getActiveEncounter(patientId)).toBeNull();
-      expect(store.encounters.get(encId)?.status).toBe("Discharged");
-    }
+    const seedActive = await getActiveEncounter("pat-10024");
+    expect(seedActive?.id).toBe("enc-seed-10024");
+    await dischargeEncounter("enc-seed-10024");
+    expect(await getActiveEncounter("pat-10024")).toBeNull();
+    expect((await getEncounter("enc-seed-10024"))?.status).toBe("Discharged");
   });
 });

@@ -11,7 +11,6 @@ import {
   DEPARTMENTS,
   FACILITIES,
   PROVIDERS,
-  findNotificationByEncounter,
   getActiveEncounter,
   getPatient,
   listEncountersForPatient,
@@ -40,10 +39,17 @@ export default async function PatientChartPage({
 }) {
   const { id } = await params;
   const { tab } = await searchParams;
-  const patient = getPatient(id);
+  const patient = await getPatient(id);
   if (!patient) notFound();
-  const encounter = getActiveEncounter(id);
-  const history = listEncountersForPatient(id);
+  const [encounter, history, fhirEvents, notifications] = await Promise.all([
+    getActiveEncounter(id),
+    listEncountersForPatient(id),
+    listFhirEventsForPatient(id),
+    listNotificationsForPatient(id),
+  ]);
+  const notificationByEncounter = new Map(
+    [...notifications].reverse().map((n) => [n.encounterId, n])
+  );
   const facility = encounter
     ? FACILITIES.find((f) => f.id === encounter.facilityId)
     : undefined;
@@ -56,10 +62,8 @@ export default async function PatientChartPage({
       (encounter?.attendingProviderId ?? patient.attendingProviderId)
   );
   const notification = encounter
-    ? findNotificationByEncounter(encounter.id)
+    ? notificationByEncounter.get(encounter.id) ?? null
     : null;
-  const fhirEvents = listFhirEventsForPatient(id);
-  const notifications = listNotificationsForPatient(id);
   const activeTab = (TABS.includes(tab as (typeof TABS)[number])
     ? tab
     : "Overview") as (typeof TABS)[number];
@@ -255,7 +259,7 @@ export default async function PatientChartPage({
                 </tr>
               ) : (
                 history.map((enc) => {
-                  const note = findNotificationByEncounter(enc.id);
+                  const note = notificationByEncounter.get(enc.id);
                   return (
                     <tr key={enc.id}>
                       <td>{enc.encounterClass}</td>
