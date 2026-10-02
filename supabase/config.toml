@@ -8,3 +8,6 @@ major_version = 15
 
 [studio]
 enabled = true
+
+[functions.submit-admission-to-salesforce]
+verify_jwt = true

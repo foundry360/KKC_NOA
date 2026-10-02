@@ -5,6 +5,7 @@ import {
   createPatient,
   dischargeEncounter,
   searchPatients,
+  submitAdmissionToSalesforce,
   updatePatient,
 } from "@/src/meridian/store/runtime";
 import type {
@@ -26,6 +27,24 @@ export async function admitPatientAction(input: AdmitInput) {
     return {
       ok: false as const,
       error: e instanceof Error ? e.message : "Admission failed",
+    };
+  }
+}
+
+export async function submitAdmissionToSalesforceAction(admissionId: string) {
+  try {
+    const { outcome, record } = await submitAdmissionToSalesforce(admissionId);
+    return {
+      ok: true as const,
+      outcome,
+      status: record.status,
+      salesforceRecordId: record.salesforceRecordId,
+      errorMessage: record.errorMessage,
+    };
+  } catch (e) {
+    return {
+      ok: false as const,
+      error: e instanceof Error ? e.message : "Salesforce submission failed",
     };
   }
 }

@@ -130,6 +130,39 @@ export interface NotificationTrack {
   }>;
 }
 
+export type SalesforceIntegrationStatus =
+  | "PENDING"
+  | "SUBMITTING"
+  | "SUBMITTED"
+  | "FAILED"
+  | "RETRYABLE";
+
+export interface SalesforceSubmissionAttempt {
+  attempt: number;
+  at: string;
+  status: SalesforceIntegrationStatus;
+  httpStatus?: number;
+  errorType?: string;
+}
+
+/** Downstream Salesforce delivery of an admission; tracked separately from the admission itself. */
+export interface SalesforceSubmissionRecord {
+  /** Meridian encounter id — the canonical admission identifier. */
+  admissionId: string;
+  patientId: string;
+  fhirEventId: string;
+  integrationType: "SALESFORCE_ADMISSION";
+  status: SalesforceIntegrationStatus;
+  salesforceRecordId?: string;
+  salesforceRecordUrl?: string;
+  submittedAt?: string;
+  lastAttemptAt?: string;
+  errorType?: string;
+  errorMessage?: string;
+  attemptCount: number;
+  attempts: SalesforceSubmissionAttempt[];
+}
+
 export interface AdmitInput {
   patientId: string;
   encounterClass: EncounterClass;

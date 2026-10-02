@@ -1,8 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition, type FormEvent } from "react";
-import { admitPatientAction } from "@/app/meridian/actions";
+import { useMemo, useRef, useState, useTransition, type FormEvent } from "react";
+import {
+  admitPatientAction,
+  submitAdmissionToSalesforceAction,
+} from "@/app/meridian/actions";
 import type {
   AdmissionType,
   CoverageInfo,
@@ -11,6 +14,20 @@ import type {
 } from "@/src/meridian/types";
 
 type Option = { id: string; name: string; facilityId?: string };
+
+type StepState = "pending" | "active" | "done" | "failed";
+type Progress = {
+  admit: StepState;
+  fhir: StepState;
+  salesforce: StepState;
+  salesforceLabel?: string;
+};
+
+const IDLE_PROGRESS: Progress = {
+  admit: "pending",
+  fhir: "pending",
+  salesforce: "pending",
+};
 
 export function AdmitForm({
   patient,
@@ -32,6 +49,8 @@ export function AdmitForm({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState<Progress | null>(null);
+  const submittingRef = useRef(false);
 
   const [encounterClass, setEncounterClass] =
     useState<EncounterClass>("INPATIENT");
@@ -87,6 +106,7 @@ export function AdmitForm({
 
   function submit(e: FormEvent) {
     e.preventDefault();
+    if (submittingRef.current) return;
     setError(null);
     if (!unit.trim() || !room.trim() || !diagnosis.trim() || !memberId.trim()) {
       setError("Unit, room, diagnosis, and member ID are required.");
@@ -108,6 +128,8 @@ export function AdmitForm({
       coverageType: "Primary",
     };
 
+    submittingRef.current = true;
+    setProgress({ ...IDLE_PROGRESS, admit: "active", fhir: "active" });
     startTransition(async () => {
       const result = await admitPatientAction({
         patientId: patient.id,
@@ -125,9 +147,25 @@ export function AdmitForm({
         coverage,
       });
       if (!result.ok) {
+        submittingRef.current = false;
+        setProgress(null);
         setError(result.error);
         return;
       }
+
+      setProgress({ admit: "done", fhir: "done", salesforce: "active" });
+      const sf = await submitAdmissionToSalesforceAction(result.encounterId);
+      const created =
+        sf.ok && (sf.outcome === "submitted" || sf.outcome === "already_submitted");
+      setProgress({
+        admit: "done",
+        fhir: "done",
+        salesforce: created ? "done" : "failed",
+        salesforceLabel: created
+          ? "Salesforce Admission Created"
+          : "Salesforce Submission Failed",
+      });
+
       router.push(`/meridian/admissions/${result.encounterId}`);
       router.refresh();
     });
@@ -136,6 +174,7 @@ export function AdmitForm({
   return (
     <form onSubmit={submit} className="space-y-3">
       {error ? <div className="mh-demo">{error}</div> : null}
+      {progress ? <AdmitProgress progress={progress} /> : null}
 
       <section className="mh-panel">
         <h2 className="mh-panel-title">Patient</h2>
@@ -332,8 +371,8 @@ export function AdmitForm({
       </section>
 
       <div className="flex flex-wrap gap-2">
-        <button type="submit" className="mh-btn" disabled={pending}>
-          {pending ? "Admitting…" : "Admit Patient"}
+        <button type="submit" className="mh-btn" disabled={pending || !!progress}>
+          {pending || progress ? "Admitting…" : "Admit Patient"}
         </button>
         <button
           type="button"
@@ -345,6 +384,48 @@ export function AdmitForm({
         </button>
       </div>
     </form>
+  );
+}
+
+function AdmitProgress({ progress }: { progress: Progress }) {
+  const steps: Array<{ state: StepState; active: string; done: string; failed?: string }> = [
+    { state: progress.admit, active: "Admitting Patient…", done: "Patient Admitted" },
+    { state: progress.fhir, active: "Generating FHIR Admission…", done: "FHIR Admission Generated" },
+    {
+      state: progress.salesforce,
+      active: "Sending to Salesforce…",
+      done: progress.salesforceLabel ?? "Salesforce Admission Created",
+      failed: progress.salesforceLabel ?? "Salesforce Submission Failed",
+    },
+  ];
+  return (
+    <section className="mh-panel" aria-live="polite">
+      <h2 className="mh-panel-title">Admission Progress</h2>
+      <ul className="mh-panel-body space-y-1 text-[14px]">
+        {steps.map((s, i) => (
+          <li key={i} className="flex items-center gap-2">
+            <span
+              className={
+                s.state === "done"
+                  ? "mh-badge mh-badge-ok"
+                  : s.state === "failed"
+                    ? "mh-badge mh-badge-danger"
+                    : "mh-badge"
+              }
+            >
+              {s.state === "done" ? "✓" : s.state === "failed" ? "!" : s.state === "active" ? "…" : "○"}
+            </span>
+            <span className={s.state === "pending" ? "text-[var(--mh-muted)]" : undefined}>
+              {s.state === "done"
+                ? s.done
+                : s.state === "failed"
+                  ? s.failed ?? s.done
+                  : s.active}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 

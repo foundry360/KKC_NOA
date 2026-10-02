@@ -14,10 +14,13 @@ import type {
   FhirEventRecord,
   NotificationTrack,
   Patient,
+  SalesforceIntegrationStatus,
+  SalesforceSubmissionRecord,
   UpdatePatientInput,
 } from "@/src/meridian/types";
 import { buildAdmissionBundle } from "@/src/meridian/fhir/build-admission-bundle";
 import { sendFhirAdmissionEvent } from "@/src/meridian/services/noa-client";
+import { submitAdmissionPayload } from "@/src/meridian/services/salesforce-client";
 
 export type MeridianStore = {
   patients: Map<string, Patient>;
@@ -26,9 +29,13 @@ export type MeridianStore = {
   notifications: Map<string, NotificationTrack>;
   /** patientId → active encounter id */
   activeEncounterByPatient: Map<string, string>;
+  /** admission (encounter) id → Salesforce integration status */
+  salesforceSubmissions: Map<string, SalesforceSubmissionRecord>;
+  /** admission ids with a Salesforce call currently in flight in this process */
+  salesforceInFlight: Set<string>;
 };
 
-const STORE_VERSION = 2;
+const STORE_VERSION = 3;
 
 const globalStore = globalThis as typeof globalThis & {
   __meridianStore?: MeridianStore;
@@ -50,6 +57,8 @@ function createStore(): MeridianStore {
     fhirEvents: new Map(),
     notifications: new Map(),
     activeEncounterByPatient,
+    salesforceSubmissions: new Map(),
+    salesforceInFlight: new Set(),
   };
 }
 
@@ -348,8 +357,134 @@ export async function admitPatient(input: AdmitInput): Promise<{
   store.activeEncounterByPatient.set(patient.id, encounter.id);
   store.fhirEvents.set(fhirEvent.id, fhirEvent);
   store.notifications.set(notification.id, notification);
+  store.salesforceSubmissions.set(encounter.id, {
+    admissionId: encounter.id,
+    patientId: patient.id,
+    fhirEventId: fhirEvent.id,
+    integrationType: "SALESFORCE_ADMISSION",
+    status: "PENDING",
+    attemptCount: 0,
+    attempts: [],
+  });
 
   return { encounter, fhirEvent, notification };
+}
+
+/** The exact Payload__c text: the stored FHIR Bundle, pretty-printed. Stable across retries. */
+export function serializeAdmissionPayload(bundle: Record<string, unknown>): string {
+  return JSON.stringify(bundle, null, 2);
+}
+
+export function getSalesforceSubmission(admissionId: string) {
+  return getMeridianStore().salesforceSubmissions.get(admissionId) ?? null;
+}
+
+export function isSalesforceSubmissionInFlight(admissionId: string) {
+  return getMeridianStore().salesforceInFlight.has(admissionId);
+}
+
+const RESPONSE_STATUS: Record<string, SalesforceIntegrationStatus> = {
+  submitted: "SUBMITTED",
+  submitting: "SUBMITTING",
+  failed: "FAILED",
+  retryable: "RETRYABLE",
+};
+
+export type SalesforceSubmitResult =
+  | { outcome: "submitted" | "already_submitted"; record: SalesforceSubmissionRecord }
+  | { outcome: "in_progress" | "failed"; record: SalesforceSubmissionRecord };
+
+/**
+ * Sends the admission's existing FHIR payload to Salesforce via the Edge
+ * Function. Retries reuse the same stored Bundle; no new clinical event is
+ * generated. Duplicate submissions are blocked locally (in-flight / already
+ * SUBMITTED) and durably by the Edge Function's claim on admission_id.
+ */
+export async function submitAdmissionToSalesforce(
+  admissionId: string
+): Promise<SalesforceSubmitResult> {
+  const store = getMeridianStore();
+  const fhirEvent = findFhirByEncounter(admissionId);
+  if (!fhirEvent) throw new Error("No FHIR admission event exists for this admission");
+
+  let record = store.salesforceSubmissions.get(admissionId);
+  if (!record) {
+    record = {
+      admissionId,
+      patientId: fhirEvent.patientId,
+      fhirEventId: fhirEvent.id,
+      integrationType: "SALESFORCE_ADMISSION",
+      status: "PENDING",
+      attemptCount: 0,
+      attempts: [],
+    };
+    store.salesforceSubmissions.set(admissionId, record);
+  }
+
+  if (record.status === "SUBMITTED") {
+    return { outcome: "already_submitted", record: structuredClone(record) };
+  }
+  if (store.salesforceInFlight.has(admissionId)) {
+    return { outcome: "in_progress", record: structuredClone(record) };
+  }
+
+  store.salesforceInFlight.add(admissionId);
+  record.status = "SUBMITTING";
+  record.lastAttemptAt = new Date().toISOString();
+  try {
+    const response = await submitAdmissionPayload({
+      admissionId,
+      payload: serializeAdmissionPayload(fhirEvent.bundle),
+    });
+    const status = RESPONSE_STATUS[response.status] ?? "FAILED";
+    const success = response.success && status === "SUBMITTED" && !!response.salesforceRecordId;
+
+    record.status = success ? "SUBMITTED" : status === "SUBMITTED" ? "FAILED" : status;
+    record.attemptCount = response.attemptCount ?? record.attemptCount + 1;
+    if (success) {
+      record.salesforceRecordId = response.salesforceRecordId;
+      record.salesforceRecordUrl = response.salesforceRecordUrl;
+      record.submittedAt = response.submittedAt ?? new Date().toISOString();
+      record.errorType = undefined;
+      record.errorMessage = undefined;
+    } else {
+      record.errorType = response.errorType ?? "UNKNOWN";
+      record.errorMessage =
+        response.message ?? "Salesforce submission failed. Please retry.";
+    }
+    record.attempts.push({
+      attempt: record.attemptCount,
+      at: record.lastAttemptAt,
+      status: record.status,
+      httpStatus: response.httpStatus,
+      errorType: success ? undefined : record.errorType,
+    });
+
+    if (success) {
+      return {
+        outcome: response.duplicate ? "already_submitted" : "submitted",
+        record: structuredClone(record),
+      };
+    }
+    return {
+      outcome: record.status === "SUBMITTING" ? "in_progress" : "failed",
+      record: structuredClone(record),
+    };
+  } catch {
+    record.status = "RETRYABLE";
+    record.attemptCount += 1;
+    record.errorType = "SALESFORCE_CONNECTION";
+    record.errorMessage = "Salesforce submission failed. Please retry.";
+    record.attempts.push({
+      attempt: record.attemptCount,
+      at: record.lastAttemptAt,
+      status: record.status,
+      errorType: record.errorType,
+    });
+    return { outcome: "failed", record: structuredClone(record) };
+  } finally {
+    store.salesforceInFlight.delete(admissionId);
+  }
 }
 
 export { FACILITIES, DEPARTMENTS, PROVIDERS, PAYERS };
