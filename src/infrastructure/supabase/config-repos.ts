@@ -170,6 +170,16 @@ export class SupabaseContractRepository implements ContractRepository {
       if (input.product && v.product && v.product !== input.product) {
         return false;
       }
+      if (
+        v.payerBrand &&
+        input.payer &&
+        v.payerBrand.trim().toLowerCase() !== input.payer.trim().toLowerCase()
+      ) {
+        return false;
+      }
+      if (v.payerBrand && !input.payer) {
+        return false;
+      }
       return true;
     });
   }
@@ -185,8 +195,14 @@ export class SupabaseContractRepository implements ContractRepository {
         name: string;
         payer: string | null;
         product: string | null;
+        payer_brand?: string | null;
+        state_code?: string | null;
+        source_type?: string | null;
         active: boolean;
       };
+      const profile = (row.profile ?? undefined) as
+        | ContractVersionRecord["profile"]
+        | undefined;
       return {
         id: row.id,
         contractBusinessId: header.contract_id,
@@ -194,6 +210,12 @@ export class SupabaseContractRepository implements ContractRepository {
         version: row.version,
         payer: header.payer ?? undefined,
         product: header.product ?? undefined,
+        payerBrand:
+          header.payer_brand ?? profile?.payerBrand ?? undefined,
+        planProduct: profile?.planProduct,
+        state: header.state_code ?? profile?.state ?? undefined,
+        facilityId: profile?.providerFacility,
+        network: profile?.network,
         payloadFormat: row.payload_format,
         transport: row.transport,
         destinationId: row.destination_id,
@@ -204,6 +226,7 @@ export class SupabaseContractRepository implements ContractRepository {
         effectiveDate: row.effective_date,
         expirationDate: row.expiration_date,
         active: header.active,
+        profile,
       };
     });
   }

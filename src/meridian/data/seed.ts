@@ -111,7 +111,7 @@ export const PAYERS: PayerDef[] = [
   { id: "pay-medicare", name: "Medicare", payerType: "MEDICARE" },
   {
     id: "pay-bcbs",
-    name: "Blue Cross Blue Shield",
+    name: "Blue Cross Blue Shield of Arizona",
     payerType: "COMMERCIAL",
   },
   {

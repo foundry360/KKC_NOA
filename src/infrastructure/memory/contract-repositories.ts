@@ -67,10 +67,21 @@ export class InMemoryContractRepository implements ContractRepository {
         if (input.contractBusinessId) {
           return v.contractBusinessId === input.contractBusinessId;
         }
+        // Broad filter only; specificity scoring happens in the registry.
         if (input.payerType && v.payer && v.payer !== input.payerType) {
           return false;
         }
         if (input.product && v.product && v.product !== input.product) {
+          return false;
+        }
+        if (
+          v.payerBrand &&
+          input.payer &&
+          v.payerBrand.trim().toLowerCase() !== input.payer.trim().toLowerCase()
+        ) {
+          return false;
+        }
+        if (v.payerBrand && !input.payer) {
           return false;
         }
         return true;

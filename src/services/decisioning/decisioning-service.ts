@@ -70,6 +70,9 @@ export class DecisioningService {
         eventType: admission.eventType,
         encounterClass: admission.encounter.class,
         payerType: admission.payer.payerType,
+        payerName: admission.payer.name,
+        plan: admission.coverage.plan,
+        facilityState: admission.facility.address?.state,
       },
       matchedRuleVersions: decision.ruleVersions,
       resultSummary: decision,
@@ -112,6 +115,12 @@ export class DecisioningService {
         notificationRequired: decision.notificationRequired,
         notificationType: decision.notificationType,
         priority: decision.priority,
+        requirementOutcome: decision.explanation?.requirementOutcome,
+        authorizationRequirement:
+          decision.explanation?.authorizationRequirement,
+        notificationTimingStatus:
+          decision.explanation?.notificationTimingStatus,
+        sources: decision.explanation?.sources,
       },
       references: { decisionId: decisionRecord.id },
     });

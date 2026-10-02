@@ -128,8 +128,26 @@ export default async function EventDetailPage({
               items={[
                 { label: "Decision", value: decision.decision },
                 {
-                  label: "NOA required",
+                  label: "Requirement outcome",
+                  value:
+                    decision.explanation?.requirementOutcome ??
+                    (decision.notificationRequired
+                      ? "NOTIFICATION_REQUIRED"
+                      : "NOTIFICATION_NOT_REQUIRED"),
+                },
+                {
+                  label: "NOA / notification required",
                   value: decision.notificationRequired ? "Yes" : "No",
+                },
+                {
+                  label: "Authorization requirement",
+                  value:
+                    decision.explanation?.authorizationRequirement ?? "UNKNOWN",
+                },
+                {
+                  label: "Timing status",
+                  value:
+                    decision.explanation?.notificationTimingStatus ?? "UNKNOWN",
                 },
                 {
                   label: "Type / Priority",
@@ -150,8 +168,70 @@ export default async function EventDetailPage({
                   mono: true,
                   wide: true,
                 },
+                {
+                  label: "Reason",
+                  value: decision.explanation?.reason ?? "—",
+                  wide: true,
+                },
               ]}
             />
+            {decision.explanation?.sources?.length ? (
+              <div className="mt-4 space-y-3">
+                <p className="text-xs uppercase tracking-[0.1em] text-subtle">
+                  Evidence / sources
+                </p>
+                {decision.explanation.sources.map((src, idx) => (
+                  <Panel key={`${src.sourceUrl}-${idx}`}>
+                    <DefList
+                      items={[
+                        {
+                          label: "Source type",
+                          value: src.sourceType,
+                          mono: true,
+                        },
+                        { label: "Source", value: src.source, wide: true },
+                        {
+                          label: "Source URL",
+                          value: src.sourceUrl,
+                          mono: true,
+                          wide: true,
+                        },
+                        {
+                          label: "Verified",
+                          value: src.verificationDate ?? "—",
+                          mono: true,
+                        },
+                        {
+                          label: "Effective",
+                          value: src.effectiveDate ?? "—",
+                          mono: true,
+                        },
+                        {
+                          label: "Evidence",
+                          value: src.evidence,
+                          wide: true,
+                        },
+                      ]}
+                    />
+                  </Panel>
+                ))}
+              </div>
+            ) : null}
+            {decision.explanation?.notificationWindow &&
+            decision.explanation.notificationWindow !== "UNKNOWN" ? (
+              <div className="mt-4">
+                <p className="mb-2 text-xs uppercase tracking-[0.1em] text-subtle">
+                  Notification window
+                </p>
+                <CodeBlock>
+                  {JSON.stringify(
+                    decision.explanation.notificationWindow,
+                    null,
+                    2
+                  )}
+                </CodeBlock>
+              </div>
+            ) : null}
             {execution ? (
               <div className="mt-4">
                 <p className="mb-2 text-xs uppercase tracking-[0.1em] text-subtle">
@@ -168,15 +248,34 @@ export default async function EventDetailPage({
         )}
       </Section>
 
-      <Section title="Contract / Routing">
+      <Section title="Contract profile">
         {selection ? (
           <Panel>
             <DefList
               items={[
                 {
-                  label: "Contract",
+                  label: "Contract profile",
                   value: selection.contractBusinessId,
                   mono: true,
+                },
+                {
+                  label: "Contract version id",
+                  value: selection.contractVersionId,
+                  mono: true,
+                },
+                {
+                  label: "Source type",
+                  value:
+                    selection.routing.contractVersion.profile?.sourceType ??
+                    "GENERIC_PAYER_TYPE",
+                  mono: true,
+                },
+                {
+                  label: "Payer brand",
+                  value:
+                    selection.routing.contractVersion.payerBrand ??
+                    selection.routing.contractVersion.profile?.payerBrand ??
+                    "—",
                 },
                 { label: "Destination", value: selection.destinationCode },
                 { label: "Adapter", value: selection.adapterKey },
@@ -185,8 +284,30 @@ export default async function EventDetailPage({
                   value: selection.transformerCode,
                   mono: true,
                 },
+                {
+                  label: "Ack behavior",
+                  value:
+                    selection.routing.contractVersion.profile
+                      ?.acknowledgementBehavior ??
+                    selection.routing.contractVersion.acknowledgementType,
+                  wide: true,
+                },
               ]}
             />
+            {selection.routing.contractVersion.profile?.sourceReference ? (
+              <div className="mt-4">
+                <p className="mb-2 text-xs uppercase tracking-[0.1em] text-subtle">
+                  Profile source reference
+                </p>
+                <CodeBlock>
+                  {JSON.stringify(
+                    selection.routing.contractVersion.profile.sourceReference,
+                    null,
+                    2
+                  )}
+                </CodeBlock>
+              </div>
+            ) : null}
           </Panel>
         ) : (
           <p className="text-sm text-muted">
@@ -199,6 +320,51 @@ export default async function EventDetailPage({
                 : ""}
             .
           </p>
+        )}
+      </Section>
+
+      <Section title="Execution">
+        {notification || transform ? (
+          <Panel>
+            <DefList
+              items={[
+                {
+                  label: "Transformation",
+                  value: transform
+                    ? `${transform.transformerCode}@v${transform.transformerVersion}`
+                    : "—",
+                  mono: true,
+                },
+                {
+                  label: "Destination",
+                  value: selection?.destinationCode ?? "—",
+                },
+                {
+                  label: "Delivery status",
+                  value: notification?.status ?? "—",
+                },
+                {
+                  label: "Acknowledgement",
+                  value:
+                    deliveryAttempts.find((a) => a.acknowledgement)
+                      ?.acknowledgement?.ackId ?? "—",
+                  mono: true,
+                },
+                {
+                  label: "Retry attempts",
+                  value: String(deliveryAttempts.length),
+                },
+                {
+                  label: "Note",
+                  value:
+                    "Delivery acknowledgement is not an authorization approval unless the payer transaction explicitly represents authorization.",
+                  wide: true,
+                },
+              ]}
+            />
+          </Panel>
+        ) : (
+          <p className="text-sm text-muted">No execution recorded yet.</p>
         )}
       </Section>
 

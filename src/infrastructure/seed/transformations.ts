@@ -203,6 +203,218 @@ const PEGA_MAPPINGS: TransformationDefinition["mappings"] = [
   },
 ];
 
+/**
+ * SYNTHETIC_DEMO_TRANSFORM — fields limited to those documented in public Aetna
+ * precert/referral materials. Not a production Aetna EDI/API payload.
+ */
+const AETNA_DEMO_MAPPINGS: TransformationDefinition["mappings"] = [
+  {
+    sourcePath: "_meta.transactionKind",
+    targetPath: "transactionKind",
+    required: false,
+    defaultValue: "ADMISSION_NOTIFICATION",
+  },
+  {
+    sourcePath: "_meta.transformKind",
+    targetPath: "transformKind",
+    required: false,
+    defaultValue: "SYNTHETIC_DEMO_TRANSFORM",
+  },
+  {
+    sourcePath: "_meta.payerProfile",
+    targetPath: "payerProfile",
+    required: false,
+    defaultValue: "AETNA_COMMERCIAL_INPATIENT_NOTIFICATION_V1",
+  },
+  {
+    sourcePath: "_meta.notificationWindow",
+    targetPath: "notificationWindow",
+    required: false,
+    defaultValue: {
+      value: 2,
+      unit: "BUSINESS_DAYS",
+      startEvent: "EMERGENCY_ADMISSION_TIME",
+    },
+  },
+  { sourcePath: "patient.memberId", targetPath: "memberId", required: false },
+  { sourcePath: "coverage.subscriberId", targetPath: "memberId", required: false },
+  { sourcePath: "patient.birthDate", targetPath: "dateOfBirth", required: false },
+  {
+    sourcePath: "admission.admissionDateTime",
+    targetPath: "admissionDateTime",
+    required: true,
+    transform: "dateIso",
+  },
+  {
+    sourcePath: "diagnoses.0.code",
+    targetPath: "diagnosisCode",
+    required: false,
+  },
+  { sourcePath: "encounter.class", targetPath: "placeOfServiceClass", required: true },
+  { sourcePath: "facility.npi", targetPath: "facilityNpi", required: false },
+  { sourcePath: "facility.name", targetPath: "facilityName", required: false },
+  { sourcePath: "providers.0.npi", targetPath: "servicingProviderNpi", required: false },
+  { sourcePath: "payer.name", targetPath: "payerName", required: true },
+  { sourcePath: "correlationId", targetPath: "correlationId", required: true },
+  {
+    sourcePath: "_meta.authorizationNote",
+    targetPath: "authorizationNote",
+    required: false,
+    defaultValue:
+      "Notification is distinct from coverage determination / precertification.",
+  },
+];
+
+/**
+ * SYNTHETIC_DEMO_TRANSFORM — Cigna inpatient notification channel + report window
+ * from public docs. Not a production Cigna payload.
+ */
+const CIGNA_DEMO_MAPPINGS: TransformationDefinition["mappings"] = [
+  {
+    sourcePath: "_meta.transactionKind",
+    targetPath: "transactionKind",
+    required: false,
+    defaultValue: "ADMISSION_NOTIFICATION",
+  },
+  {
+    sourcePath: "_meta.transformKind",
+    targetPath: "transformKind",
+    required: false,
+    defaultValue: "SYNTHETIC_DEMO_TRANSFORM",
+  },
+  {
+    sourcePath: "_meta.payerProfile",
+    targetPath: "payerProfile",
+    required: false,
+    defaultValue: "CIGNA_COMMERCIAL_INPATIENT_NOTIFICATION_V1",
+  },
+  {
+    sourcePath: "_meta.submissionChannel",
+    targetPath: "submissionChannel",
+    required: false,
+    defaultValue: "PROVIDER_SERVICES_PHONE",
+  },
+  {
+    sourcePath: "_meta.onlinePrecertToolAllowed",
+    targetPath: "onlinePrecertToolAllowedForInpatientNotification",
+    required: false,
+    defaultValue: false,
+  },
+  {
+    sourcePath: "_meta.notificationWindow",
+    targetPath: "notificationWindow",
+    required: false,
+    defaultValue: {
+      value: 1,
+      unit: "BUSINESS_DAYS",
+      startEvent: "EMERGENCY_ADMISSION_TIME",
+    },
+  },
+  { sourcePath: "patient.memberId", targetPath: "memberId", required: false },
+  { sourcePath: "coverage.subscriberId", targetPath: "memberId", required: false },
+  {
+    sourcePath: "admission.admissionDateTime",
+    targetPath: "admissionDateTime",
+    required: true,
+    transform: "dateIso",
+  },
+  {
+    sourcePath: "diagnoses.0.code",
+    targetPath: "primaryDiagnosisCode",
+    required: false,
+  },
+  { sourcePath: "facility.name", targetPath: "servicingFacilityName", required: false },
+  { sourcePath: "facility.npi", targetPath: "servicingFacilityNpi", required: false },
+  { sourcePath: "payer.name", targetPath: "payerName", required: true },
+  { sourcePath: "correlationId", targetPath: "correlationId", required: true },
+  {
+    sourcePath: "_meta.authorizationNote",
+    targetPath: "authorizationNote",
+    required: false,
+    defaultValue:
+      "Emergency services do not require precertification; reporting inpatient admission is a notification, not an authorization approval.",
+  },
+];
+
+/**
+ * SYNTHETIC_DEMO_TRANSFORM — AZ Blue commercial required notification fields /
+ * channels from public quick guide. Not a production AZ Blue payload.
+ */
+const BCBSAZ_DEMO_MAPPINGS: TransformationDefinition["mappings"] = [
+  {
+    sourcePath: "_meta.transactionKind",
+    targetPath: "transactionKind",
+    required: false,
+    defaultValue: "ADMISSION_NOTIFICATION",
+  },
+  {
+    sourcePath: "_meta.transformKind",
+    targetPath: "transformKind",
+    required: false,
+    defaultValue: "SYNTHETIC_DEMO_TRANSFORM",
+  },
+  {
+    sourcePath: "_meta.payerProfile",
+    targetPath: "payerProfile",
+    required: false,
+    defaultValue: "BCBSAZ_COMMERCIAL_INPATIENT_NOTIFICATION_V1",
+  },
+  {
+    sourcePath: "_meta.submissionChannels",
+    targetPath: "submissionChannels",
+    required: false,
+    defaultValue: ["AVAILITY", "FAX", "PHONE"],
+  },
+  {
+    sourcePath: "_meta.notificationWindow",
+    targetPath: "notificationWindow",
+    required: false,
+    defaultValue: {
+      value: 48,
+      unit: "HOURS",
+      startEvent: "ADMISSION_TIME",
+    },
+  },
+  {
+    sourcePath: "patient.name.family",
+    targetPath: "memberName.family",
+    required: false,
+  },
+  {
+    sourcePath: "patient.name.given",
+    targetPath: "memberName.given",
+    required: false,
+    transform: "first",
+  },
+  { sourcePath: "patient.birthDate", targetPath: "dateOfBirth", required: false },
+  { sourcePath: "patient.memberId", targetPath: "memberId", required: false },
+  { sourcePath: "coverage.subscriberId", targetPath: "memberId", required: false },
+  {
+    sourcePath: "admission.admissionDateTime",
+    targetPath: "admissionDateTime",
+    required: true,
+    transform: "dateIso",
+  },
+  {
+    sourcePath: "diagnoses.0.code",
+    targetPath: "diagnosisCodes.0",
+    required: false,
+  },
+  { sourcePath: "encounter.class", targetPath: "placeOfService", required: true },
+  { sourcePath: "facility.npi", targetPath: "facilityNpi", required: false },
+  { sourcePath: "facility.name", targetPath: "facilityName", required: false },
+  { sourcePath: "providers.0.npi", targetPath: "providerNpi", required: false },
+  { sourcePath: "payer.name", targetPath: "payerName", required: true },
+  { sourcePath: "correlationId", targetPath: "correlationId", required: true },
+  {
+    sourcePath: "_meta.authorizationNote",
+    targetPath: "authorizationNote",
+    required: false,
+    defaultValue:
+      "Prior authorization is code/plan dependent and separate from post-admission notification.",
+  },
+];
+
 /** Full mapping definitions for Step 7 + NOA admission-alert field expansion. */
 export function createSeedTransformations(): TransformationDefinition[] {
   return [
@@ -229,6 +441,30 @@ export function createSeedTransformations(): TransformationDefinition[] {
       sourceModel: "AdmissionEvent",
       targetFormat: "JSON",
       mappings: PEGA_MAPPINGS,
+    },
+    {
+      id: "33333333-3333-4333-8333-333333333004",
+      code: "AETNA_ADMISSION_NOTIFICATION_V1",
+      version: 1,
+      sourceModel: "AdmissionEvent",
+      targetFormat: "JSON",
+      mappings: AETNA_DEMO_MAPPINGS,
+    },
+    {
+      id: "33333333-3333-4333-8333-333333333005",
+      code: "CIGNA_ADMISSION_NOTIFICATION_V1",
+      version: 1,
+      sourceModel: "AdmissionEvent",
+      targetFormat: "JSON",
+      mappings: CIGNA_DEMO_MAPPINGS,
+    },
+    {
+      id: "33333333-3333-4333-8333-333333333006",
+      code: "BCBSAZ_ADMISSION_NOTIFICATION_V1",
+      version: 1,
+      sourceModel: "AdmissionEvent",
+      targetFormat: "JSON",
+      mappings: BCBSAZ_DEMO_MAPPINGS,
     },
   ];
 }

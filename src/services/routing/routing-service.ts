@@ -78,7 +78,9 @@ export class RoutingService implements RoutingEngine {
     const resolved = await registry.resolve({
       notificationType: decision.notificationType,
       payerType: event.payer.payerType,
+      payer: event.payer.name,
       encounterClass: event.encounter.class,
+      facilityId: event.facility.id,
       contractBusinessId: options?.contractBusinessId,
       asOf: new Date(event.eventTimestamp),
     });

@@ -8,10 +8,15 @@ import type {
 import type { RoutingResult } from "@/src/domain/routing/routing";
 import { DEFAULT_NOA_CONTRACT_BUSINESS_ID } from "@/src/infrastructure/seed/contracts";
 import { ConfigurationError } from "@/src/domain/errors/app-error";
+import { selectMostSpecificContracts } from "./contract-specificity";
 
 /**
  * Resolves contract + destination + transformer from registry configuration.
  * Independent of Salesforce/Pega SDKs.
+ *
+ * Matching precedence (see contract-specificity.ts):
+ * Exact facility > network > state > plan > payer brand > payer type > default.
+ * Same-specificity brand conflicts throw ConfigurationError.
  */
 export class DefaultContractRegistry implements ContractRegistry {
   constructor(
@@ -22,13 +27,27 @@ export class DefaultContractRegistry implements ContractRegistry {
   ) {}
 
   async resolve(input: ContractSelectionInput): Promise<RoutingResult | null> {
-    let matches = await this.contracts.findMatching(input);
+    const candidates = await this.contracts.findMatching(input);
+    const { selected, conflict } = selectMostSpecificContracts(candidates, input);
 
-    if (matches.length === 0) {
+    if (selected.length === 0) {
       return null;
     }
 
-    // When multiple contracts match (e.g. Mock/SF/Pega for Medicare),
+    if (conflict && !input.contractBusinessId) {
+      throw new ConfigurationError(
+        "Conflicting contract profiles at the same specificity require resolution",
+        {
+          contractBusinessIds: selected.map((c) => c.contractBusinessId),
+          payer: input.payer,
+          payerType: input.payerType,
+        }
+      );
+    }
+
+    let matches = selected;
+
+    // When multiple contracts match at the same score (e.g. Mock/SF/Pega for Medicare),
     // prefer explicit override, then configured default, then any *MOCK* contract.
     if (!input.contractBusinessId && matches.length > 1) {
       const preferred = matches.find(
