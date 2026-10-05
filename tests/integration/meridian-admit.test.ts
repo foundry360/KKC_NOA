@@ -38,6 +38,46 @@ describe("Meridian admit → NOA", () => {
     expect(result.notification.acknowledgement?.ackId).toBeTruthy();
   });
 
+  it("admits an ER-to-admit patient through NOA and stores the ED encounter", async () => {
+    const patient = SEED_PATIENTS[0];
+    const admittedAt = new Date().toISOString();
+    const base = {
+      patientId: patient.id,
+      encounterClass: "INPATIENT" as const,
+      admissionType: "Emergency" as const,
+      facilityId: "fac-jax",
+      departmentId: "dep-medsurg",
+      unit: "4 South",
+      room: "402",
+      admittedAt,
+      attendingProviderId: "prov-williams",
+      principalDiagnosis: "Pneumonia",
+      coverage: { ...patient.coverage },
+    };
+    const edVisit = {
+      arrivedAt: new Date(Date.now() - 90 * 60_000).toISOString(),
+      chiefComplaint: "Shortness of breath",
+      providerId: "prov-chen",
+      location: "ED Bay 7",
+    };
+
+    const result = await admitPatient({ ...base, edVisit });
+    expect(result.fhirEvent.status).toBe("SENT");
+    expect(result.notification.processingState).toBe("ACKNOWLEDGED");
+    expect(result.encounter.edVisit).toEqual(edVisit);
+    const types = (result.fhirEvent.bundle.entry as Array<{ resource: { resourceType: string } }>)
+      .map((e) => e.resource.resourceType)
+      .filter((t) => t === "Encounter");
+    expect(types).toHaveLength(2);
+
+    await expect(
+      admitPatient({ ...base, edVisit: { ...edVisit, arrivedAt: new Date(Date.now() + 60_000).toISOString() } })
+    ).rejects.toThrow("ED arrival must be before");
+    await expect(
+      admitPatient({ ...base, edVisit: { ...edVisit, providerId: "nope" } })
+    ).rejects.toThrow("Invalid ED attending");
+  });
+
   it("admits commercial patient Maria Garcia through full NOA path", async () => {
     const patient = SEED_PATIENTS.find((p) => p.mrn === "MRN-10035");
     expect(patient).toBeTruthy();

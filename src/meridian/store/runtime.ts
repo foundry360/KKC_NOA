@@ -262,6 +262,31 @@ export async function admitPatient(input: AdmitInput): Promise<{
     throw new Error("Invalid facility, department, or provider");
   }
 
+  let edVisit: Encounter["edVisit"];
+  let edProvider: (typeof PROVIDERS)[number] | undefined;
+  if (input.edVisit) {
+    if (input.encounterClass === "EMERGENCY") {
+      throw new Error("An ED visit can only precede an inpatient or observation admission");
+    }
+    edProvider = PROVIDERS.find((p) => p.id === input.edVisit!.providerId);
+    if (!edProvider) throw new Error("Invalid ED attending provider");
+    const arrived = Date.parse(input.edVisit.arrivedAt);
+    if (Number.isNaN(arrived) || arrived >= Date.parse(input.admittedAt)) {
+      throw new Error("ED arrival must be before the admission date/time");
+    }
+    const chiefComplaint = input.edVisit.chiefComplaint.trim();
+    const location = input.edVisit.location.trim();
+    if (!chiefComplaint || !location) {
+      throw new Error("ED chief complaint and location are required");
+    }
+    edVisit = {
+      arrivedAt: new Date(arrived).toISOString(),
+      chiefComplaint,
+      providerId: edProvider.id,
+      location,
+    };
+  }
+
   const encounter: Encounter = {
     id: randomUUID(),
     patientId: patient.id,
@@ -278,6 +303,7 @@ export async function admitPatient(input: AdmitInput): Promise<{
     principalDiagnosis: input.principalDiagnosis,
     service: input.service,
     coverageSnapshot: structuredClone(input.coverage),
+    edVisit,
   };
 
   patient.coverage = structuredClone(input.coverage);
@@ -290,6 +316,7 @@ export async function admitPatient(input: AdmitInput): Promise<{
     facility,
     department,
     provider,
+    edProvider,
   });
 
   const fhirEvent: FhirEventRecord = {

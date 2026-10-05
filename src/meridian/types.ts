@@ -75,6 +75,14 @@ export interface Patient {
   attendingProviderId?: string;
 }
 
+/** Emergency department visit that preceded an admission (ER-to-admit). */
+export interface EdVisit {
+  arrivedAt: string;
+  chiefComplaint: string;
+  providerId: string;
+  location: string;
+}
+
 export interface Encounter {
   id: string;
   patientId: string;
@@ -91,6 +99,7 @@ export interface Encounter {
   principalDiagnosis: string;
   service?: string;
   coverageSnapshot: CoverageInfo;
+  edVisit?: EdVisit;
 }
 
 export interface FhirEventRecord {
@@ -177,6 +186,7 @@ export interface AdmitInput {
   principalDiagnosis: string;
   service?: string;
   coverage: CoverageInfo;
+  edVisit?: EdVisit;
   /** Optional demo override forwarded as X-Contract-Id */
   contractBusinessId?: string;
 }

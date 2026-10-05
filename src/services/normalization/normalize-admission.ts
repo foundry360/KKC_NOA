@@ -13,6 +13,7 @@ import type { CorrelationId, UUID } from "@/src/domain/types";
 import {
   asBundle,
   extractResources,
+  findAdmissionEncounter,
   findResource,
   findResources,
   getNestedString,
@@ -381,6 +382,21 @@ function mapDiagnoses(
   return diagnoses;
 }
 
+/** FHIR Encounter.hospitalization.admitSource code (e.g. "emd" = from emergency department). */
+function mapAdmitSource(encounter?: FhirResource): string | undefined {
+  const hospitalization = isObject(encounter?.hospitalization)
+    ? encounter.hospitalization
+    : undefined;
+  const admitSource = isObject(hospitalization?.admitSource)
+    ? hospitalization.admitSource
+    : undefined;
+  const coding = Array.isArray(admitSource?.coding) ? admitSource.coding : [];
+  for (const c of coding) {
+    if (isObject(c) && typeof c.code === "string") return c.code;
+  }
+  return undefined;
+}
+
 export class AdmissionNormalizationService implements NormalizationService {
   async toAdmissionEvent(
     bundle: unknown,
@@ -393,7 +409,7 @@ export class AdmissionNormalizationService implements NormalizationService {
 
     const resources = extractResources(fhirBundle);
     const patient = findResource(resources, "Patient");
-    const encounter = findResource(resources, "Encounter");
+    const encounter = findAdmissionEncounter(resources);
     const coverage = findResource(resources, "Coverage");
     const messageHeader = findResource(resources, "MessageHeader");
 
@@ -441,6 +457,7 @@ export class AdmissionNormalizationService implements NormalizationService {
       },
       admission: {
         admissionDateTime: periodStart,
+        admitSource: mapAdmitSource(encounter),
       },
       facility: mapFacility(resources, encounter),
       payer: mapPayer(resources, coverage),

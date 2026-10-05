@@ -35,6 +35,12 @@ async function main() {
     principalDiagnosis: "Pneumonia",
     service: "Internal Medicine",
     coverage: { ...patient.coverage },
+    edVisit: {
+      arrivedAt: new Date(Date.now() - 90 * 60_000).toISOString(),
+      chiefComplaint: "Shortness of breath",
+      providerId: "prov-chen",
+      location: "ED Bay 7",
+    },
   });
   const payload = serializeAdmissionPayload(fhirEvent.bundle);
   console.log(`admissionId=${encounter.id} payloadChars=${payload.length}`);

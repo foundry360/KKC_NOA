@@ -83,6 +83,19 @@ export function AdmitForm({
   const [groupNumber, setGroupNumber] = useState(
     patient.coverage.groupNumber ?? ""
   );
+  const [arrivedViaEd, setArrivedViaEd] = useState(true);
+  const [edArrivedAt, setEdArrivedAt] = useState(() => {
+    const d = new Date(Date.now() - 90 * 60_000);
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().slice(0, 16);
+  });
+  const [edComplaint, setEdComplaint] = useState("Shortness of breath");
+  const [edProviderId, setEdProviderId] = useState(
+    providers.find((p) => p.id === "prov-chen")?.id ?? providers[0]?.id ?? ""
+  );
+  const [edLocation, setEdLocation] = useState("ED Bay 7");
+  const edApplies = admissionType === "Emergency" && encounterClass !== "EMERGENCY";
+  const includeEd = edApplies && arrivedViaEd;
 
   const facilityDepartments = useMemo(
     () => departments.filter((d) => d.facilityId === facilityId),
@@ -117,6 +130,16 @@ export function AdmitForm({
       setError("Select a payer.");
       return;
     }
+    if (includeEd) {
+      if (!edComplaint.trim() || !edLocation.trim()) {
+        setError("ED chief complaint and location are required.");
+        return;
+      }
+      if (new Date(edArrivedAt) >= new Date(admittedAt)) {
+        setError("ED arrival must be before the admission date/time.");
+        return;
+      }
+    }
 
     const coverage: CoverageInfo = {
       payerId: payer.id,
@@ -145,6 +168,14 @@ export function AdmitForm({
         principalDiagnosis: diagnosis.trim(),
         service,
         coverage,
+        edVisit: includeEd
+          ? {
+              arrivedAt: new Date(edArrivedAt).toISOString(),
+              chiefComplaint: edComplaint.trim(),
+              providerId: edProviderId,
+              location: edLocation.trim(),
+            }
+          : undefined,
       });
       if (!result.ok) {
         submittingRef.current = false;
@@ -290,6 +321,64 @@ export function AdmitForm({
           </Field>
         </div>
       </section>
+
+      {edApplies ? (
+        <section className="mh-panel">
+          <h2 className="mh-panel-title">Emergency Department Visit</h2>
+          <div className="mh-panel-body space-y-2">
+            <label className="flex items-center gap-2 text-[14px]">
+              <input
+                type="checkbox"
+                checked={arrivedViaEd}
+                onChange={(e) => setArrivedViaEd(e.target.checked)}
+              />
+              Arrived via Emergency Department (ER-to-admit)
+            </label>
+            {arrivedViaEd ? (
+              <div className="grid gap-2 sm:grid-cols-4">
+                <Field label="ED Arrival">
+                  <input
+                    type="datetime-local"
+                    className="mh-input"
+                    value={edArrivedAt}
+                    onChange={(e) => setEdArrivedAt(e.target.value)}
+                    required
+                  />
+                </Field>
+                <Field label="Chief Complaint">
+                  <input
+                    className="mh-input"
+                    value={edComplaint}
+                    onChange={(e) => setEdComplaint(e.target.value)}
+                    required
+                  />
+                </Field>
+                <Field label="ED Attending">
+                  <select
+                    className="mh-select"
+                    value={edProviderId}
+                    onChange={(e) => setEdProviderId(e.target.value)}
+                  >
+                    {providers.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.label}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="ED Location">
+                  <input
+                    className="mh-input"
+                    value={edLocation}
+                    onChange={(e) => setEdLocation(e.target.value)}
+                    required
+                  />
+                </Field>
+              </div>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
 
       <section className="mh-panel">
         <h2 className="mh-panel-title">Coverage</h2>

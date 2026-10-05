@@ -60,6 +60,27 @@ export function resolveReference(
   return resources.find((r) => r.resourceType === type && r.id === id);
 }
 
+/**
+ * The Encounter being admitted. Bundles may also carry prior encounters (e.g.
+ * the ED visit in an ER-to-admit), so prefer MessageHeader.focus, then the
+ * first non-finished Encounter, then the first Encounter.
+ */
+export function findAdmissionEncounter(
+  resources: FhirResource[]
+): FhirResource | undefined {
+  const encounters = findResources(resources, "Encounter");
+  if (encounters.length <= 1) return encounters[0];
+
+  const header = findResource(resources, "MessageHeader");
+  const focus = Array.isArray(header?.focus) ? header.focus : [];
+  for (const item of focus) {
+    const ref = isObject(item) && typeof item.reference === "string" ? item.reference : undefined;
+    const target = resolveReference(resources, ref);
+    if (target?.resourceType === "Encounter") return target;
+  }
+  return encounters.find((e) => e.status !== "finished") ?? encounters[0];
+}
+
 export function getNestedString(
   obj: Record<string, unknown> | undefined,
   path: string[]

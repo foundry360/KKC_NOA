@@ -30,14 +30,93 @@ function dx(name: string) {
   return DIAGNOSIS_CODES[name] ?? { code: "R69", display: name };
 }
 
+const ATTENDER = [
+  {
+    coding: [
+      {
+        system: "http://terminology.hl7.org/CodeSystem/v3-ParticipationType",
+        code: "ATND",
+        display: "attender",
+      },
+    ],
+  },
+];
+
+function practitionerEntry(provider: Provider) {
+  return {
+    fullUrl: `urn:uuid:${provider.id}`,
+    resource: {
+      resourceType: "Practitioner",
+      id: provider.id,
+      identifier: provider.npi
+        ? [{ system: "http://hl7.org/fhir/sid/us-npi", value: provider.npi }]
+        : undefined,
+      name: [
+        {
+          family: provider.name.split(" ").slice(-1)[0],
+          given: provider.name.split(" ").slice(0, -1),
+          text: `${provider.name}, ${provider.credentials}`,
+        },
+      ],
+    },
+  };
+}
+
+/** ED Encounter for ER-to-admit; ends where the admitted encounter begins. */
+function edEncounterEntry(args: {
+  id: string;
+  encounter: Encounter;
+  edProvider: Provider;
+  patientRef: string;
+  facilityRef: string;
+}) {
+  const { id, encounter, edProvider, patientRef, facilityRef } = args;
+  const ed = encounter.edVisit!;
+  return {
+    fullUrl: `urn:uuid:${id}`,
+    resource: {
+      resourceType: "Encounter",
+      id,
+      status: "finished",
+      class: {
+        system: "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+        code: "EMER",
+        display: "emergency",
+      },
+      priority: {
+        coding: [
+          {
+            system: "http://terminology.hl7.org/CodeSystem/v3-ActPriority",
+            code: "EM",
+            display: "emergency",
+          },
+        ],
+      },
+      subject: { reference: patientRef },
+      period: { start: ed.arrivedAt, end: encounter.admittedAt },
+      serviceProvider: { reference: facilityRef },
+      location: [{ location: { display: ed.location } }],
+      reasonCode: [{ text: ed.chiefComplaint }],
+      participant: [
+        { type: ATTENDER, individual: { reference: `Practitioner/${edProvider.id}` } },
+      ],
+    },
+  };
+}
+
 export function buildAdmissionBundle(input: {
   patient: Patient;
   encounter: Encounter;
   facility: Facility;
   department: Department;
   provider: Provider;
+  /** Required when encounter.edVisit is set. */
+  edProvider?: Provider;
 }): Record<string, unknown> {
-  const { patient, encounter, facility, provider } = input;
+  const { patient, encounter, facility, provider, edProvider } = input;
+  const edEncounterId =
+    encounter.edVisit && edProvider ? `ed-${encounter.id}` : undefined;
+  const edEncounterRef = edEncounterId ? `Encounter/${edEncounterId}` : undefined;
   const patientRef = `Patient/${patient.id}`;
   const encounterRef = `Encounter/${encounter.id}`;
   const facilityRef = `Organization/${facility.id}`;
@@ -119,6 +198,17 @@ export function buildAdmissionBundle(input: {
           ],
         },
       },
+      ...(edEncounterId && edProvider
+        ? [
+            edEncounterEntry({
+              id: edEncounterId,
+              encounter,
+              edProvider,
+              patientRef,
+              facilityRef,
+            }),
+          ]
+        : []),
       {
         fullUrl: `urn:uuid:${encounter.id}`,
         resource: {
@@ -147,6 +237,23 @@ export function buildAdmissionBundle(input: {
           },
           subject: { reference: patientRef },
           period: { start: timestamp },
+          ...(edEncounterRef
+            ? {
+                partOf: { reference: edEncounterRef },
+                hospitalization: {
+                  admitSource: {
+                    coding: [
+                      {
+                        system: "http://terminology.hl7.org/CodeSystem/admit-source",
+                        code: "emd",
+                        display: "From accident/emergency department",
+                      },
+                    ],
+                  },
+                  origin: { reference: edEncounterRef },
+                },
+              }
+            : {}),
           serviceProvider: { reference: facilityRef },
           location: [
             {
@@ -156,21 +263,7 @@ export function buildAdmissionBundle(input: {
             },
           ],
           participant: [
-            {
-              type: [
-                {
-                  coding: [
-                    {
-                      system:
-                        "http://terminology.hl7.org/CodeSystem/v3-ParticipationType",
-                      code: "ATND",
-                      display: "attender",
-                    },
-                  ],
-                },
-              ],
-              individual: { reference: practitionerRef },
-            },
+            { type: ATTENDER, individual: { reference: practitionerRef } },
           ],
           diagnosis: [
             {
@@ -319,28 +412,10 @@ export function buildAdmissionBundle(input: {
           ],
         },
       },
-      {
-        fullUrl: `urn:uuid:${provider.id}`,
-        resource: {
-          resourceType: "Practitioner",
-          id: provider.id,
-          identifier: provider.npi
-            ? [
-                {
-                  system: "http://hl7.org/fhir/sid/us-npi",
-                  value: provider.npi,
-                },
-              ]
-            : undefined,
-          name: [
-            {
-              family: provider.name.split(" ").slice(-1)[0],
-              given: provider.name.split(" ").slice(0, -1),
-              text: `${provider.name}, ${provider.credentials}`,
-            },
-          ],
-        },
-      },
+      practitionerEntry(provider),
+      ...(edEncounterId && edProvider && edProvider.id !== provider.id
+        ? [practitionerEntry(edProvider)]
+        : []),
     ],
   };
 }

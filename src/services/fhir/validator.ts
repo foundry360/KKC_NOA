@@ -2,6 +2,7 @@ import type { FhirValidator, FhirValidationResult } from "@/src/domain/ports";
 import {
   asBundle,
   extractResources,
+  findAdmissionEncounter,
   findResource,
   findResources,
   getNestedString,
@@ -101,7 +102,7 @@ export class AdmissionFhirValidator implements FhirValidator {
       });
     }
 
-    const encounter = findResource(resources, "Encounter");
+    const encounter = findAdmissionEncounter(resources);
     if (!encounter) {
       errors.push({
         path: "entry",
